@@ -492,17 +492,83 @@ export const PresenterDashboard: React.FC = () => {
     }
   }
 
-  // Deletes an entire quiz
+  // Deletes an entire quiz and its corresponding storage assets
   const handleDeleteQuiz = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this quiz? This will delete all its questions, sessions, and responses permanently.')) return
+    if (!window.confirm('Are you sure you want to delete this quiz? This will delete all its questions, sessions, responses, and associated uploaded images permanently.')) return
 
     try {
+      setLoading(true)
+
+      // 1. Gather all questions for this quiz to extract image URLs
+      const { data: questionsData, error: qErr } = await supabase
+        .from('questions')
+        .select('image_url, options')
+        .eq('quiz_id', id)
+
+      if (qErr) throw qErr
+
+      const imagesToDelete: string[] = []
+      if (questionsData) {
+        questionsData.forEach((q: any) => {
+          if (q.image_url) {
+            imagesToDelete.push(q.image_url)
+          }
+          if (Array.isArray(q.options)) {
+            q.options.forEach((opt: any) => {
+              if (opt.image_url) {
+                imagesToDelete.push(opt.image_url)
+              }
+            })
+          }
+        })
+      }
+
+      // 2. Delete the quiz from database (cascades to questions & sessions)
       const { error: delErr } = await supabase.from('quizzes').delete().eq('id', id)
       if (delErr) throw delErr
+
+      // 3. For each image, check if it's used elsewhere, and delete if orphan
+      for (const imgUrl of imagesToDelete) {
+        if (!imgUrl.includes('/storage/v1/object/public/yalcit-media/')) continue
+
+        // Check if still used in other questions (active question image)
+        const { data: qUsage } = await supabase
+          .from('questions')
+          .select('id')
+          .eq('image_url', imgUrl)
+          .limit(1)
+
+        if (qUsage && qUsage.length > 0) continue
+
+        // Check if still used in options (MCQ option images)
+        const { data: optUsage } = await supabase
+          .from('questions')
+          .select('id')
+          .contains('options', [{ image_url: imgUrl }])
+          .limit(1)
+
+        if (optUsage && optUsage.length > 0) continue
+
+        // Extract filename from URL path and delete from storage
+        const pathParts = imgUrl.split('/yalcit-media/')
+        if (pathParts.length > 1) {
+          const filePath = pathParts[1]
+          const { error: storageDelErr } = await supabase.storage
+            .from('yalcit-media')
+            .remove([filePath])
+          if (storageDelErr) {
+            console.error('Failed to delete storage file:', filePath, storageDelErr)
+          }
+        }
+      }
+
       setQuizzes(quizzes.filter((q) => q.id !== id))
-    } catch (err) {
+      fetchData()
+    } catch (err: any) {
       console.error('Delete error:', err)
-      alert('Could not delete quiz.')
+      alert('Could not delete quiz: ' + err.message)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -1262,7 +1328,7 @@ export const PresenterDashboard: React.FC = () => {
                               </div>
                               
                               {/* Option Image input */}
-                              <div className="flex items-center gap-1.5 pl-10">
+                              <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-border/30">
                                 <input
                                   type="url"
                                   placeholder="Option Image URL (Optional)..."
@@ -1274,39 +1340,41 @@ export const PresenterDashboard: React.FC = () => {
                                     updated[qIdx].options = updatedOptions
                                     setQuestions(updated)
                                   }}
-                                  className="flex-grow px-2.5 py-1.5 rounded-lg bg-white/5 dark:bg-white/5 border border-border text-text-primary text-[10px] focus:outline-none focus:border-brand-primary/50 transition-all font-medium"
+                                  className="flex-grow min-w-[120px] px-2.5 py-1.5 rounded-lg bg-white/5 dark:bg-white/5 border border-border text-text-primary text-[10px] focus:outline-none focus:border-brand-primary/50 transition-all font-medium"
                                 />
-                                <label className="flex-shrink-0 cursor-pointer p-1.5 rounded bg-white/10 hover:bg-white/15 border border-border text-[10px] font-bold text-text-primary flex items-center gap-1">
-                                  <Upload className="w-3 h-3 text-brand-accent" />
-                                  <span>Upload</span>
-                                  <input 
-                                    type="file" 
-                                    accept="image/*" 
-                                    className="hidden" 
-                                    onChange={(e) => {
-                                      const file = e.target.files?.[0]
-                                      if (file) {
-                                        handleOptionImageUpload(qIdx, oIdx, file)
-                                      }
-                                    }}
-                                  />
-                                </label>
-                                {opt.image_url && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const updated = [...questions]
-                                      const updatedOptions = [...updated[qIdx].options]
-                                      delete updatedOptions[oIdx].image_url
-                                      updated[qIdx].options = updatedOptions
-                                      setQuestions(updated)
-                                    }}
-                                    className="p-1.5 rounded bg-brand-error/10 hover:bg-brand-error/20 border border-brand-error/30 text-[10px] font-bold text-brand-error cursor-pointer"
-                                    title="Remove option image"
-                                  >
-                                    Remove
-                                  </button>
-                                )}
+                                <div className="flex items-center gap-1.5 flex-shrink-0">
+                                  <label className="cursor-pointer px-2 py-1 rounded bg-white/10 hover:bg-white/15 border border-border text-[10px] font-bold text-text-primary flex items-center gap-1 transition-all">
+                                    <Upload className="w-3 h-3 text-brand-accent" />
+                                    <span>Upload</span>
+                                    <input 
+                                      type="file" 
+                                      accept="image/*" 
+                                      className="hidden" 
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0]
+                                        if (file) {
+                                          handleOptionImageUpload(qIdx, oIdx, file)
+                                        }
+                                      }}
+                                    />
+                                  </label>
+                                  {opt.image_url && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const updated = [...questions]
+                                        const updatedOptions = [...updated[qIdx].options]
+                                        delete updatedOptions[oIdx].image_url
+                                        updated[qIdx].options = updatedOptions
+                                        setQuestions(updated)
+                                      }}
+                                      className="px-2 py-1 rounded bg-brand-error/10 hover:bg-brand-error/20 border border-brand-error/30 text-[10px] font-bold text-brand-error cursor-pointer transition-all"
+                                      title="Remove option image"
+                                    >
+                                      Remove
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           ))}
