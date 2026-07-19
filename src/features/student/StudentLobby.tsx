@@ -22,6 +22,7 @@ export const StudentLobby: React.FC = () => {
   const [sessionId, setSessionId] = useState<string | null>(location.state?.sessionId || null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'error'>('connecting')
 
   useEffect(() => {
     if (!code || !user || !profile) return
@@ -83,11 +84,14 @@ export const StudentLobby: React.FC = () => {
           })
           .subscribe(async (status: string) => {
             if (status === 'SUBSCRIBED') {
+              setRealtimeStatus('connected')
               await presenceChannel.track({
                 user_id: user.id,
                 display_name: profile.display_name,
                 joined_at: new Date().toISOString(),
               })
+            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+              setRealtimeStatus('error')
             }
           })
 
@@ -234,6 +238,13 @@ export const StudentLobby: React.FC = () => {
             )}
           </div>
         </div>
+        {/* Realtime Connection Status Toast */}
+        {realtimeStatus !== 'connected' && (
+          <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-2.5 rounded-xl border text-xs font-bold shadow-lg bg-yellow-500/10 border-yellow-500/20 text-yellow-500">
+            <span className="w-2 h-2 rounded-full bg-yellow-500 animate-ping" />
+            <span>{realtimeStatus === 'connecting' ? 'Connecting to real-time sync...' : 'Disconnected. Reconnecting...'}</span>
+          </div>
+        )}
       </main>
     </div>
   )

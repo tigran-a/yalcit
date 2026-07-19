@@ -27,6 +27,7 @@ export const StudentQuiz: React.FC = () => {
   const [submitting, setSubmitting] = useState(false)
   const [timeLeft, setTimeLeft] = useState(30)
   const [timerActive, setTimerActive] = useState(false)
+  const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'error'>('connecting')
 
   // Grading/Reveal States
   const [correctOptionId, setCorrectOptionId] = useState<string | null>(null)
@@ -169,7 +170,13 @@ export const StudentQuiz: React.FC = () => {
               }
             }
           )
-          .subscribe()
+          .subscribe((status: string) => {
+            if (status === 'SUBSCRIBED') {
+              setRealtimeStatus('connected')
+            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+              setRealtimeStatus('error')
+            }
+          })
 
       } catch (err: any) {
         console.error('Quiz initialization failed:', err)
@@ -356,25 +363,41 @@ export const StudentQuiz: React.FC = () => {
 
             {activeQuestion.type === 'multiple_choice' ? (
               /* MCQ layout */
-              <div className="grid grid-cols-1 gap-3 max-w-md mx-auto">
+              <div className={`grid gap-3 max-w-md mx-auto ${
+                activeQuestion.options.some((o: any) => o.image_url) ? 'grid-cols-2' : 'grid-cols-1'
+              }`}>
                 {activeQuestion.options.map((opt: any) => (
                   <button
                     key={opt.id}
                     onClick={() => setSelectedOption(opt.id)}
-                    className={`p-4 rounded-2xl border text-left font-bold text-text-primary transition-all duration-200 cursor-pointer flex items-center gap-4 ${
+                    className={`p-3 rounded-2xl border text-left font-bold text-text-primary transition-all duration-200 cursor-pointer flex flex-col gap-2.5 ${
                       selectedOption === opt.id
                         ? 'bg-brand-primary/20 border-brand-primary text-brand-primary-light shadow-lg'
                         : 'bg-white/5 dark:bg-white/5 border-border hover:border-brand-primary/30'
                     }`}
                   >
-                    <span className={`w-8 h-8 rounded-lg flex items-center justify-center font-extrabold ${
-                      selectedOption === opt.id
-                        ? 'bg-brand-primary/30 text-text-primary'
-                        : 'bg-white/5 dark:bg-white/5 text-text-secondary'
-                    }`}>
-                      {opt.id}
-                    </span>
-                    <span>{opt.text}</span>
+                    {opt.image_url && (
+                      <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden bg-slate-100 dark:bg-white/5">
+                        <img 
+                          src={opt.image_url} 
+                          alt={`Option ${opt.id}`} 
+                          className="w-full h-full object-cover" 
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
+                    <div className="flex items-center gap-3">
+                      <span className={`w-7 h-7 rounded-lg flex items-center justify-center font-extrabold text-xs flex-shrink-0 ${
+                        selectedOption === opt.id
+                          ? 'bg-brand-primary/30 text-text-primary'
+                          : 'bg-white/5 dark:bg-white/5 text-text-secondary'
+                      }`}>
+                        {opt.id}
+                      </span>
+                      <span className="text-xs truncate">{opt.text}</span>
+                    </div>
                   </button>
                 ))}
               </div>
@@ -478,6 +501,13 @@ export const StudentQuiz: React.FC = () => {
             >
               Back to Home
             </button>
+          </div>
+        )}
+        {/* Realtime Connection Status Toast */}
+        {realtimeStatus !== 'connected' && (
+          <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-2.5 rounded-xl border text-xs font-bold shadow-lg bg-yellow-500/10 border-yellow-500/20 text-yellow-500">
+            <span className="w-2 h-2 rounded-full bg-yellow-500 animate-ping" />
+            <span>{realtimeStatus === 'connecting' ? 'Connecting to real-time sync...' : 'Disconnected. Reconnecting...'}</span>
           </div>
         )}
       </main>

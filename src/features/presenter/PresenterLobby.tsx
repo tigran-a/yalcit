@@ -30,6 +30,7 @@ export const PresenterLobby: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'error'>('connecting')
 
   useEffect(() => {
     if (!code) return
@@ -86,7 +87,13 @@ export const PresenterLobby: React.FC = () => {
             list.sort((a, b) => new Date(a.joined_at).getTime() - new Date(b.joined_at).getTime())
             setParticipants(list)
           })
-          .subscribe()
+          .subscribe((status: string) => {
+            if (status === 'SUBSCRIBED') {
+              setRealtimeStatus('connected')
+            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+              setRealtimeStatus('error')
+            }
+          })
 
       } catch (err: any) {
         console.error('Lobby initialization failed:', err)
@@ -267,6 +274,13 @@ export const PresenterLobby: React.FC = () => {
             </p>
           )}
         </div>
+        {/* Realtime Connection Status Toast */}
+        {realtimeStatus !== 'connected' && (
+          <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-2.5 rounded-xl border text-xs font-bold shadow-lg bg-yellow-500/10 border-yellow-500/20 text-yellow-500">
+            <span className="w-2 h-2 rounded-full bg-yellow-500 animate-ping" />
+            <span>{realtimeStatus === 'connecting' ? 'Connecting to real-time sync...' : 'Disconnected. Reconnecting...'}</span>
+          </div>
+        )}
       </main>
     </div>
   )

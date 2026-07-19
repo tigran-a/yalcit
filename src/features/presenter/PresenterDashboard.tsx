@@ -23,7 +23,7 @@ interface Question {
   type: 'multiple_choice' | 'open_ended'
   title: string
   image_url?: string
-  options: { id: string; text: string }[]
+  options: { id: string; text: string; image_url?: string }[]
   time_limit: number
   correct_option_id?: string
 }
@@ -335,6 +335,46 @@ export const PresenterDashboard: React.FC = () => {
       }
     ])
     setShowCreator(false)
+  }
+
+  // Image upload helpers
+  const handleUploadImage = async (file: File, callback: (url: string) => void) => {
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${user?.id || 'anonymous'}/${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`
+      
+      const { error: uploadErr } = await supabase.storage
+        .from('yalcit-media')
+        .upload(fileName, file, { cacheControl: '3600', upsert: true })
+
+      if (uploadErr) throw uploadErr
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('yalcit-media')
+        .getPublicUrl(fileName)
+
+      callback(publicUrl)
+    } catch (err: any) {
+      console.error('Image upload failed:', err)
+      alert('Failed to upload image: ' + err.message)
+    }
+  }
+
+  const handleQuestionImageUpload = async (qIdx: number, file: File) => {
+    await handleUploadImage(file, (url) => {
+      updateQuestionData(qIdx, 'image_url', url)
+    })
+  }
+
+  const handleOptionImageUpload = async (qIdx: number, oIdx: number, file: File) => {
+    await handleUploadImage(file, (url) => {
+      const updated = [...questions]
+      const updatedOptions = [...updated[qIdx].options]
+      updatedOptions[oIdx] = { ...updatedOptions[oIdx], image_url: url }
+      updated[qIdx].options = updatedOptions
+      setQuestions(updated)
+    })
   }
 
   // Load quiz details for editing
@@ -1149,18 +1189,44 @@ export const PresenterDashboard: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Question Image URL */}
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-text-secondary mb-2">
-                        Question Image URL (Optional)
+                    {/* Question Image URL & Upload */}
+                    <div className="space-y-2">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-text-secondary">
+                        Question Image (Optional)
                       </label>
-                      <input
-                        type="url"
-                        placeholder="e.g. https://images.unsplash.com/photo-12345..."
-                        value={q.image_url || ''}
-                        onChange={(e) => updateQuestionData(qIdx, 'image_url', e.target.value)}
-                        className="w-full px-4 py-2.5 rounded-xl bg-white/5 dark:bg-white/5 border border-border focus:border-brand-primary/50 text-text-primary placeholder:text-text-secondary/40 focus:outline-none transition-all text-xs font-semibold"
-                      />
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="url"
+                          placeholder="e.g. https://images.unsplash.com/photo-12345..."
+                          value={q.image_url || ''}
+                          onChange={(e) => updateQuestionData(qIdx, 'image_url', e.target.value)}
+                          className="flex-grow px-4 py-2.5 rounded-xl bg-white/5 dark:bg-white/5 border border-border focus:border-brand-primary/50 text-text-primary placeholder:text-text-secondary/40 focus:outline-none transition-all text-xs font-semibold"
+                        />
+                        <label className="flex-shrink-0 cursor-pointer px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 border border-border text-xs font-bold text-text-primary flex items-center gap-1.5 transition-all">
+                          <Upload className="w-4 h-4 text-brand-accent" />
+                          <span>Upload File</span>
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            className="hidden" 
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              if (file) {
+                                handleQuestionImageUpload(qIdx, file)
+                              }
+                            }}
+                          />
+                        </label>
+                        {q.image_url && (
+                          <button
+                            type="button"
+                            onClick={() => updateQuestionData(qIdx, 'image_url', '')}
+                            className="px-3 py-2.5 rounded-xl bg-brand-error/10 hover:bg-brand-error/20 border border-brand-error/30 text-xs font-bold text-brand-error cursor-pointer transition-all"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {/* Options list for Multiple Choice */}
@@ -1171,27 +1237,77 @@ export const PresenterDashboard: React.FC = () => {
                         </label>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {q.options.map((opt, oIdx) => (
-                            <div key={opt.id} className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => updateQuestionData(qIdx, 'correct_option_id', opt.id)}
-                                className={`w-8 h-8 rounded-lg font-bold flex items-center justify-center border transition-all cursor-pointer ${
-                                  q.correct_option_id === opt.id
-                                    ? 'bg-brand-success/20 border-brand-success text-brand-success shadow-md shadow-brand-success/15'
-                                    : 'bg-white/5 dark:bg-white/5 border-border hover:border-brand-success/40 text-text-secondary'
-                                }`}
-                                title="Mark as Correct Answer"
-                              >
-                                {opt.id}
-                              </button>
-                              <input
-                                type="text"
-                                placeholder={`Label for option ${opt.id}...`}
-                                value={opt.text}
-                                onChange={(e) => updateOptionText(qIdx, oIdx, e.target.value)}
-                                className="flex-grow px-3 py-2 rounded-lg bg-white/5 dark:bg-white/5 border border-border text-text-primary text-xs focus:outline-none focus:border-brand-primary/50 transition-all font-medium"
-                                required={q.type === 'multiple_choice'}
-                              />
+                            <div key={opt.id} className="space-y-2 p-3 rounded-xl bg-white/5 border border-border/50">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => updateQuestionData(qIdx, 'correct_option_id', opt.id)}
+                                  className={`w-8 h-8 rounded-lg font-bold flex items-center justify-center border transition-all cursor-pointer ${
+                                    q.correct_option_id === opt.id
+                                      ? 'bg-brand-success/20 border-brand-success text-brand-success shadow-md shadow-brand-success/15'
+                                      : 'bg-white/5 dark:bg-white/5 border-border hover:border-brand-success/40 text-text-secondary'
+                                  }`}
+                                  title="Mark as Correct Answer"
+                                >
+                                  {opt.id}
+                                </button>
+                                <input
+                                  type="text"
+                                  placeholder={`Label for option ${opt.id}...`}
+                                  value={opt.text}
+                                  onChange={(e) => updateOptionText(qIdx, oIdx, e.target.value)}
+                                  className="flex-grow px-3 py-2 rounded-lg bg-white/5 dark:bg-white/5 border border-border text-text-primary text-xs focus:outline-none focus:border-brand-primary/50 transition-all font-medium"
+                                  required={q.type === 'multiple_choice'}
+                                />
+                              </div>
+                              
+                              {/* Option Image input */}
+                              <div className="flex items-center gap-1.5 pl-10">
+                                <input
+                                  type="url"
+                                  placeholder="Option Image URL (Optional)..."
+                                  value={opt.image_url || ''}
+                                  onChange={(e) => {
+                                    const updated = [...questions]
+                                    const updatedOptions = [...updated[qIdx].options]
+                                    updatedOptions[oIdx] = { ...updatedOptions[oIdx], image_url: e.target.value }
+                                    updated[qIdx].options = updatedOptions
+                                    setQuestions(updated)
+                                  }}
+                                  className="flex-grow px-2.5 py-1.5 rounded-lg bg-white/5 dark:bg-white/5 border border-border text-text-primary text-[10px] focus:outline-none focus:border-brand-primary/50 transition-all font-medium"
+                                />
+                                <label className="flex-shrink-0 cursor-pointer p-1.5 rounded bg-white/10 hover:bg-white/15 border border-border text-[10px] font-bold text-text-primary flex items-center gap-1">
+                                  <Upload className="w-3 h-3 text-brand-accent" />
+                                  <span>Upload</span>
+                                  <input 
+                                    type="file" 
+                                    accept="image/*" 
+                                    className="hidden" 
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0]
+                                      if (file) {
+                                        handleOptionImageUpload(qIdx, oIdx, file)
+                                      }
+                                    }}
+                                  />
+                                </label>
+                                {opt.image_url && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const updated = [...questions]
+                                      const updatedOptions = [...updated[qIdx].options]
+                                      delete updatedOptions[oIdx].image_url
+                                      updated[qIdx].options = updatedOptions
+                                      setQuestions(updated)
+                                    }}
+                                    className="p-1.5 rounded bg-brand-error/10 hover:bg-brand-error/20 border border-brand-error/30 text-[10px] font-bold text-brand-error cursor-pointer"
+                                    title="Remove option image"
+                                  >
+                                    Remove
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           ))}
                         </div>
