@@ -1,0 +1,140 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-brand-primary: hsl(262, 83%, 58%);
+  --color-brand-primary-light: hsl(262, 83%, 68%);
+  --color-brand-secondary: hsl(316, 83%, 58%);
+  --color-brand-accent: hsl(172, 80%, 50%);
+  --color-brand-success: hsl(142, 70%, 45%);
+  --color-brand-warning: hsl(38, 92%, 50%);
+  --color-brand-error: hsl(0, 84%, 60%);
+
+  --color-bg: var(--color-bg);
+  --color-surface: var(--color-surface);
+  --color-surface-hover: var(--color-surface-hover);
+  --color-border: var(--color-border);
+  --color-text-primary: var(--color-text-primary);
+  --color-text-secondary: var(--color-text-secondary);
+
+  --font-sans: "Outfit", "Inter", system-ui, -apple-system, sans-serif;
+  
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-glow: glow 2s ease-in-out infinite alternate;
+}
+
+:root {
+  /* Default: Light Theme */
+  --color-bg: hsl(210, 20%, 98%);
+  --color-surface: hsl(0, 0%, 100%);
+  --color-surface-hover: hsl(210, 20%, 95%);
+  --color-border: hsl(210, 20%, 90%);
+  --color-text-primary: hsl(224, 25%, 12%);
+  --color-text-secondary: hsl(220, 15%, 45%);
+  --color-glass-bg: rgba(255, 255, 255, 0.75);
+  --color-glass-border: rgba(0, 0, 0, 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Default system: Dark Theme */
+    --color-bg: hsl(224, 25%, 6%);
+    --color-surface: hsl(224, 25%, 10%);
+    --color-surface-hover: hsl(224, 25%, 14%);
+    --color-border: hsl(224, 20%, 18%);
+    --color-text-primary: hsl(0, 0%, 98%);
+    --color-text-secondary: hsl(220, 15%, 70%);
+    --color-glass-bg: rgba(15, 23, 42, 0.45);
+    --color-glass-border: rgba(255, 255, 255, 0.08);
+  }
+}
+
+html.dark {
+  /* Override: Dark Theme */
+  --color-bg: hsl(224, 25%, 6%);
+  --color-surface: hsl(224, 25%, 10%);
+  --color-surface-hover: hsl(224, 25%, 14%);
+  --color-border: hsl(224, 20%, 18%);
+  --color-text-primary: hsl(0, 0%, 98%);
+  --color-text-secondary: hsl(220, 15%, 70%);
+  --color-glass-bg: rgba(15, 23, 42, 0.45);
+  --color-glass-border: rgba(255, 255, 255, 0.08);
+}
+
+html.light {
+  /* Override: Light Theme */
+  --color-bg: hsl(210, 20%, 98%);
+  --color-surface: hsl(0, 0%, 100%);
+  --color-surface-hover: hsl(210, 20%, 95%);
+  --color-border: hsl(210, 20%, 90%);
+  --color-text-primary: hsl(224, 25%, 12%);
+  --color-text-secondary: hsl(220, 15%, 45%);
+  --color-glass-bg: rgba(255, 255, 255, 0.75);
+  --color-glass-border: rgba(0, 0, 0, 0.08);
+}
+
+@keyframes glow {
+  from {
+    box-shadow: 0 0 10px rgba(139, 92, 246, 0.15), 0 0 20px rgba(139, 92, 246, 0.05);
+  }
+  to {
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.3), 0 0 30px rgba(139, 92, 246, 0.15);
+  }
+}
+
+/* Custom Base Styles */
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100vh;
+  font-family: var(--font-sans);
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+  overflow-x: hidden;
+}
+
+/* Premium Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-brand-primary);
+}
+
+/* Glassmorphism helpers */
+.glass-panel {
+  background: var(--color-glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--color-glass-border);
+  transition: background 0.3s ease, border 0.3s ease, box-shadow 0.3s ease;
+}
+
+.glass-panel-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-panel-hover:hover {
+  background: var(--color-glass-bg);
+  border-color: rgba(139, 92, 246, 0.3);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.15);
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, var(--color-brand-primary-light) 0%, var(--color-brand-secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
