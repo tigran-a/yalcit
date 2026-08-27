@@ -108,6 +108,7 @@ export const JoinSession: React.FC = () => {
               placeholder="e.g. ROOM42"
               value={code}
               onChange={(e) => setCode(e.target.value)}
+              autoComplete="one-time-code"
               className="w-full px-5 py-4 rounded-2xl bg-white/5 dark:bg-white/5 border border-border focus:border-brand-primary/50 text-center text-xl font-bold tracking-widest text-text-primary placeholder:text-text-secondary/40 placeholder:tracking-normal focus:outline-none transition-all duration-300 uppercase"
               disabled={loading}
               maxLength={12}
@@ -124,6 +125,7 @@ export const JoinSession: React.FC = () => {
               placeholder="e.g. CaptainAwesome"
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}
+              autoComplete="nickname"
               className="w-full px-5 py-4 rounded-2xl bg-white/5 dark:bg-white/5 border border-border focus:border-brand-primary/50 text-center text-lg font-medium text-text-primary placeholder:text-text-secondary/40 focus:outline-none transition-all duration-300"
               disabled={loading}
               maxLength={20}

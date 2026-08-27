@@ -138,3 +138,25 @@ html, body, #root {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
+
+/* Custom WebKit / Chromium / Firefox Autofill Styling Overrides */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px var(--color-surface) inset !important;
+  -webkit-text-fill-color: var(--color-text-primary) !important;
+  caret-color: var(--color-text-primary);
+  border-color: var(--color-border) !important;
+  font-family: inherit;
+  transition: background-color 50000s ease-in-out 0s;
+}
+
+/* Custom Selection Highlight */
+::selection {
+  background-color: var(--color-brand-primary);
+  color: #ffffff;
+}
+

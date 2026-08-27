@@ -99,6 +99,7 @@ export const PresenterAuth: React.FC = () => {
                   placeholder="e.g. Professor Smith"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                  autoComplete="name"
                   className="w-full pl-12 pr-5 py-4 rounded-2xl bg-white/5 dark:bg-white/5 border border-border focus:border-brand-primary/50 text-text-primary placeholder:text-text-secondary/40 focus:outline-none transition-all duration-300"
                   disabled={loading}
                 />
@@ -119,6 +120,7 @@ export const PresenterAuth: React.FC = () => {
                 placeholder="e.g. prof@university.edu"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
                 className="w-full pl-12 pr-5 py-4 rounded-2xl bg-white/5 dark:bg-white/5 border border-border focus:border-brand-primary/50 text-text-primary placeholder:text-text-secondary/40 focus:outline-none transition-all duration-300"
                 disabled={loading}
               />
@@ -138,6 +140,7 @@ export const PresenterAuth: React.FC = () => {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                autoComplete={isSignUp ? 'new-password' : 'current-password'}
                 className="w-full pl-12 pr-5 py-4 rounded-2xl bg-white/5 dark:bg-white/5 border border-border focus:border-brand-primary/50 text-text-primary placeholder:text-text-secondary/40 focus:outline-none transition-all duration-300"
                 disabled={loading}
               />

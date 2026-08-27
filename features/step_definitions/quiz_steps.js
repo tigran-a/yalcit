@@ -1,9 +1,10 @@
-import { Given, When, Then, Before, After } from '@cucumber/cucumber'
+import { Given, When, Then, Before, After, setDefaultTimeout } from '@cucumber/cucumber'
 import assert from 'assert'
 import { createClient } from '@supabase/supabase-js'
 import dotenv from 'dotenv'
 
 dotenv.config()
+setDefaultTimeout(15000)
 
 import fs from 'fs'
 
@@ -54,18 +55,12 @@ After(async function () {
 })
 
 Given('a registered presenter {string}', async function (email) {
-  this.presenterEmail = email
+  const uniqueEmail = `bdd_${Date.now()}_${Math.floor(Math.random() * 10000)}_${email}`
+  this.presenterEmail = uniqueEmail
   
-  // 1. Delete if user already exists
-  const { data: usersData } = await adminClient.auth.admin.listUsers()
-  const existing = (usersData?.users || []).find(u => u.email === email)
-  if (existing) {
-    await adminClient.auth.admin.deleteUser(existing.id)
-  }
-
-  // 2. Create presenter
+  // Create presenter directly
   const { data: createData, error: createErr } = await adminClient.auth.admin.createUser({
-    email,
+    email: uniqueEmail,
     password: TEST_PASSWORD,
     email_confirm: true,
     user_metadata: {
@@ -76,9 +71,9 @@ Given('a registered presenter {string}', async function (email) {
   if (createErr) throw createErr
   this.presenterId = createData.user.id
 
-  // 3. Login
+  // Login
   const { error: signInErr } = await presenterClient.auth.signInWithPassword({
-    email,
+    email: uniqueEmail,
     password: TEST_PASSWORD
   })
   if (signInErr) throw signInErr
@@ -223,21 +218,16 @@ Then('a new live session with a 6-character room code is spawned', function () {
 // Scenario 2 Steps
 Given('a live session hosted by presenter {string} for quiz {string}', async function (email, quizTitle) {
   // Setup presenter
-  const { data: usersData } = await adminClient.auth.admin.listUsers()
-  const existing = (usersData?.users || []).find(u => u.email === email)
-  if (existing) {
-    await adminClient.auth.admin.deleteUser(existing.id)
-  }
-
+  const uniqueEmail = `bdd_${Date.now()}_${Math.floor(Math.random() * 10000)}_${email}`
   const { data: createData } = await adminClient.auth.admin.createUser({
-    email,
+    email: uniqueEmail,
     password: TEST_PASSWORD,
     email_confirm: true,
     user_metadata: { display_name: 'Presenter BDD', role: 'presenter' }
   })
   this.presenterId = createData.user.id
 
-  await presenterClient.auth.signInWithPassword({ email, password: TEST_PASSWORD })
+  await presenterClient.auth.signInWithPassword({ email: uniqueEmail, password: TEST_PASSWORD })
 
   // Setup quiz
   const { data: quiz } = await presenterClient
@@ -465,22 +455,13 @@ Then('RLS release allows the student to read the correct answer {string}', async
 
 // Scenario 3: Ongoing Sessions
 Given('a live session hosted by presenter {string} in {string} status', async function (email, status) {
-  // Re-use scenario 2 presenter setup
   await presenterClient.auth.signOut()
-  const { data: usersData } = await adminClient.auth.admin.listUsers()
-  const existing = (usersData?.users || []).find(u => u.email === email)
-  
-  if (!existing) {
-    // Create new
-    const { data: createData } = await adminClient.auth.admin.createUser({
-      email, password: TEST_PASSWORD, email_confirm: true, user_metadata: { role: 'presenter' }
-    })
-    this.presenterId = createData.user.id
-  } else {
-    this.presenterId = existing.id
-  }
-
-  await presenterClient.auth.signInWithPassword({ email, password: TEST_PASSWORD })
+  const uniqueEmail = `bdd_${Date.now()}_${Math.floor(Math.random() * 10000)}_${email}`
+  const { data: createData } = await adminClient.auth.admin.createUser({
+    email: uniqueEmail, password: TEST_PASSWORD, email_confirm: true, user_metadata: { role: 'presenter' }
+  })
+  this.presenterId = createData.user.id
+  await presenterClient.auth.signInWithPassword({ email: uniqueEmail, password: TEST_PASSWORD })
 
   const { data: quiz } = await presenterClient
     .from('quizzes')

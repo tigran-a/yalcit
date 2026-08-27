@@ -37,18 +37,20 @@ export const StudentQuiz: React.FC = () => {
   const currentQuestionIdRef = useRef<string | null>(null)
 
   // 1. Fetch Session Info & Current Question Details
-  const fetchActiveQuestionDetails = async (questionId: string, _sessId: string) => {
+  const fetchActiveQuestionDetails = async (questionId: string, sessId: string) => {
     try {
       setLoading(true)
       
-      // Fetch details of the active question
-      const { data: question, error: questionErr } = await supabase
-        .from('questions')
-        .select('*')
-        .eq('id', questionId)
-        .single()
+      // Fetch details of the active question and current session reveal status
+      const [questionRes, sessionRes] = await Promise.all([
+        supabase.from('questions').select('*').eq('id', questionId).single(),
+        supabase.from('sessions').select('current_question_revealed').eq('id', sessId).single()
+      ])
 
-      if (questionErr || !question) throw questionErr || new Error('Question not found')
+      if (questionRes.error || !questionRes.data) throw questionRes.error || new Error('Question not found')
+
+      const question = questionRes.data
+      const isRevealed = sessionRes.data?.current_question_revealed ?? false
 
       setActiveQuestion(question)
       currentQuestionIdRef.current = question.id
@@ -59,11 +61,6 @@ export const StudentQuiz: React.FC = () => {
       setOpenText('')
       setCorrectOptionId(null)
       setWasCorrect(false)
-      
-      // Sync local timer with time limit
-      setTimeLeft(question.time_limit)
-      setTimerActive(true)
-      setFlowState('answering')
       
       // Check if student has already submitted an answer to this question (e.g. on refresh)
       const { data: previousResponse } = await supabase
@@ -79,8 +76,18 @@ export const StudentQuiz: React.FC = () => {
         } else {
           setOpenText(previousResponse.answer?.text || '')
         }
-        setFlowState('submitted')
+      }
+
+      if (isRevealed) {
         setTimerActive(false)
+        await handleRevealAnswer(questionId, sessId)
+      } else if (previousResponse) {
+        setTimerActive(false)
+        setFlowState('submitted')
+      } else {
+        setTimeLeft(question.time_limit)
+        setTimerActive(true)
+        setFlowState('answering')
       }
       
     } catch (err: any) {
@@ -200,7 +207,7 @@ export const StudentQuiz: React.FC = () => {
       }, 1000)
     } else if (timeLeft === 0 && timerActive) {
       setTimerActive(false)
-      setFlowState('submitted') // Transition to waiting once time runs out
+      setFlowState(prev => (prev === 'answering' ? 'submitted' : prev))
     }
 
     return () => {
@@ -254,7 +261,7 @@ export const StudentQuiz: React.FC = () => {
 
   // 5. Fetch correct answer and grading info once revealed by presenter
   const handleRevealAnswer = async (questionId: string, _sessId: string) => {
-    setLoading(true)
+    setTimerActive(false)
     try {
       // A. Fetch correct answer (unlocked by RLS now that session.current_question_revealed = true)
       const { data: answerData, error: answerErr } = await supabase
@@ -282,12 +289,10 @@ export const StudentQuiz: React.FC = () => {
       } else {
         setWasCorrect(false) // Did not answer in time
       }
-
-      setFlowState('revealed')
     } catch (err) {
       console.error('Error fetching correct answer reveal:', err)
     } finally {
-      setLoading(false)
+      setFlowState('revealed')
     }
   }
 
