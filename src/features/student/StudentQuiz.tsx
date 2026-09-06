@@ -10,7 +10,7 @@ type StudentFlowState = 'answering' | 'submitted' | 'revealed' | 'ended'
 export const StudentQuiz: React.FC = () => {
   const { code } = useParams<{ code: string }>()
   const navigate = useNavigate()
-  const { user, profile } = useAuth()
+  const { user, profile, loading: authLoading } = useAuth()
 
   // Session Data States
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -100,7 +100,18 @@ export const StudentQuiz: React.FC = () => {
 
   // 2. Initial Setup: fetch session details & join realtime updates
   useEffect(() => {
-    if (!code || !user || !profile) return
+    if (authLoading) return
+
+    if (!user || !profile) {
+      if (code) {
+        navigate(`/session/${code.toUpperCase()}`)
+      } else {
+        navigate('/')
+      }
+      return
+    }
+
+    if (!code) return
 
     let dbChannel: any = null
 
@@ -197,7 +208,7 @@ export const StudentQuiz: React.FC = () => {
     return () => {
       if (dbChannel) supabase.removeChannel(dbChannel)
     }
-  }, [code, user, profile])
+  }, [code, user, profile, authLoading, navigate])
 
   // 3. Countdown timer interval logic
   useEffect(() => {
@@ -472,18 +483,51 @@ export const StudentQuiz: React.FC = () => {
               </div>
             )}
 
-            {correctOptionId && (
-              <div className="p-5 rounded-2xl bg-white/5 dark:bg-white/5 border border-border space-y-2">
-                <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider block">
-                  Correct Answer
-                </span>
-                <span className="text-2xl font-extrabold text-text-primary">
-                  {activeQuestion.type === 'multiple_choice'
-                    ? `Option ${correctOptionId}`
-                    : correctOptionId}
-                </span>
-              </div>
-            )}
+            {correctOptionId && (() => {
+              const matchedOpt = activeQuestion?.type === 'multiple_choice'
+                ? activeQuestion.options?.find((o: any) => o.id === correctOptionId)
+                : null
+
+              return (
+                <div className="p-5 rounded-2xl bg-white/5 dark:bg-white/5 border border-border space-y-3">
+                  <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider block">
+                    Correct Answer
+                  </span>
+
+                  {activeQuestion?.type === 'multiple_choice' ? (
+                    <div className="flex flex-col items-center space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-7 h-7 rounded-lg bg-brand-success/20 text-brand-success font-black text-sm flex items-center justify-center border border-brand-success/30">
+                          {correctOptionId}
+                        </span>
+                        {matchedOpt?.text && (
+                          <span className="text-lg font-extrabold text-text-primary">
+                            {matchedOpt.text}
+                          </span>
+                        )}
+                      </div>
+
+                      {matchedOpt?.image_url && (
+                        <div className="relative w-full max-w-xs aspect-video rounded-xl overflow-hidden border border-border bg-slate-100 dark:bg-white/5 shadow-sm mt-1">
+                          <img 
+                            src={matchedOpt.image_url} 
+                            alt={`Correct option ${correctOptionId}`} 
+                            className="w-full h-full object-cover" 
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-2xl font-extrabold text-brand-success block">
+                      {correctOptionId}
+                    </span>
+                  )}
+                </div>
+              )
+            })()}
 
             <div className="flex items-center gap-3 justify-center text-xs text-text-secondary animate-pulse-slow">
               <Loader2 className="w-4 h-4 animate-spin text-brand-primary-light" />

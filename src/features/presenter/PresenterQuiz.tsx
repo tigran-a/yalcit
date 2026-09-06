@@ -102,10 +102,11 @@ export const PresenterQuiz: React.FC = () => {
         setTimeLeft(currentQ.time_limit)
         setTimerActive(!session.current_question_revealed)
 
-        // Fetch current responses for this active question
+        // Fetch current responses for this active question in THIS session
         const { data: currentResponses } = await supabase
           .from('responses')
           .select('id, answer, is_correct, nickname, user_id')
+          .eq('session_id', session.id)
           .eq('question_id', currentQ.id)
 
         setResponses(currentResponses || [])
@@ -127,10 +128,23 @@ export const PresenterQuiz: React.FC = () => {
 
   // 2. Real-time changes subscription for incoming student responses
   useEffect(() => {
-    if (!activeQuestion) return
+    if (!activeQuestion || !sessionId) return
 
-    // Subscribe to responses INSERTs for this active question
-    const responseChannelName = `live_responses:${activeQuestion.id}`
+    // Fetch current responses for active question in this session
+    const fetchQuestionResponses = async () => {
+      const { data } = await supabase
+        .from('responses')
+        .select('id, answer, is_correct, nickname, user_id')
+        .eq('session_id', sessionId)
+        .eq('question_id', activeQuestion.id)
+
+      if (data) setResponses(data)
+    }
+
+    fetchQuestionResponses()
+
+    // Subscribe to responses INSERTs for this active question in this session
+    const responseChannelName = `live_responses:${sessionId}:${activeQuestion.id}`
     supabase.removeChannel(supabase.channel(responseChannelName))
     const responseChannel = supabase.channel(responseChannelName)
       .on(
@@ -142,7 +156,8 @@ export const PresenterQuiz: React.FC = () => {
           filter: `question_id=eq.${activeQuestion.id}`
         },
         (payload) => {
-          const newResponse = payload.new as StudentResponse
+          const newResponse = payload.new as any
+          if (newResponse.session_id && newResponse.session_id !== sessionId) return
           setResponses(prev => {
             // Deduplicate (safeguard)
             if (prev.some(r => r.id === newResponse.id)) return prev
@@ -161,7 +176,7 @@ export const PresenterQuiz: React.FC = () => {
     return () => {
       supabase.removeChannel(responseChannel)
     }
-  }, [activeQuestion])
+  }, [activeQuestion, sessionId])
 
   // 3. Countdown timer logic
   useEffect(() => {
@@ -205,6 +220,7 @@ export const PresenterQuiz: React.FC = () => {
       const { data: gradedResponses, error: reloadErr } = await supabase
         .from('responses')
         .select('id, answer, is_correct, nickname, user_id')
+        .eq('session_id', sessionId)
         .eq('question_id', activeQuestion.id)
 
       if (!reloadErr && gradedResponses) {
@@ -373,8 +389,8 @@ export const PresenterQuiz: React.FC = () => {
       {/* Header */}
       <header className="relative z-10 w-full max-w-5xl mx-auto flex items-center justify-between mb-8 pb-4 border-b border-border">
         <div className="flex items-center gap-4">
-          <span className="text-xs font-bold bg-white/5 dark:bg-white/5 border border-border px-3 py-1.5 rounded-full text-text-secondary">
-            Room Code: <span className="text-brand-accent font-mono font-bold">{code?.toUpperCase()}</span>
+          <span className="text-xs font-bold bg-white/5 dark:bg-white/5 border border-border px-3 py-1.5 rounded-full text-text-secondary select-none">
+            Room Code: <span className="text-brand-accent font-mono font-bold select-all cursor-pointer">{code?.toUpperCase()}</span>
           </span>
           <span className="text-xs font-bold text-text-secondary">
             Question {currentQuestionIndex + 1} of {questions.length}

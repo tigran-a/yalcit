@@ -887,7 +887,7 @@ export const PresenterDashboard: React.FC = () => {
                         {sess.quizzes?.title || 'Untitled Quiz'}
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono bg-white/10 px-1.5 py-0.5 rounded font-bold text-[10px] text-brand-primary-light">
+                        <span className="font-mono bg-white/10 px-1.5 py-0.5 rounded font-bold text-[10px] text-brand-primary-light select-all cursor-pointer">
                           {sess.code}
                         </span>
                         <span className={`capitalize font-bold text-[9px] ${

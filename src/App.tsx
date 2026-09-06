@@ -29,6 +29,7 @@ function App() {
           <Routes>
             {/* Student View Routes */}
             <Route path="/" element={<JoinSession />} />
+            <Route path="/session/:code" element={<JoinSession />} />
             <Route path="/session/:code/lobby" element={<StudentLobby />} />
             <Route path="/session/:code/quiz" element={<StudentQuiz />} />
 

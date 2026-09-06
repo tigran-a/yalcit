@@ -1,18 +1,29 @@
-import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { Sparkles, ArrowRight, AlertCircle, Loader2 } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../contexts/AuthContext'
 import { ThemeToggle } from '../../components/ThemeToggle'
 
 export const JoinSession: React.FC = () => {
-  const [code, setCode] = useState('')
+  const { code: urlCode } = useParams<{ code?: string }>()
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  const [code, setCode] = useState(urlCode || location.state?.code || '')
   const [nickname, setNickname] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (urlCode) {
+      setCode(urlCode.toUpperCase())
+    } else if (location.state?.code) {
+      setCode(location.state.code.toUpperCase())
+    }
+  }, [urlCode, location.state])
   
   const { signInAnonymously } = useAuth()
-  const navigate = useNavigate()
 
   const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault()

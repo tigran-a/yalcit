@@ -16,7 +16,7 @@ export const StudentLobby: React.FC = () => {
   const location = useLocation()
   const navigate = useNavigate()
   
-  const { user, profile } = useAuth()
+  const { user, profile, loading: authLoading } = useAuth()
   
   const [participants, setParticipants] = useState<RosterUser[]>([])
   const [sessionId, setSessionId] = useState<string | null>(location.state?.sessionId || null)
@@ -25,7 +25,18 @@ export const StudentLobby: React.FC = () => {
   const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'error'>('connecting')
 
   useEffect(() => {
-    if (!code || !user || !profile) return
+    if (authLoading) return
+
+    if (!user || !profile) {
+      if (code) {
+        navigate(`/session/${code.toUpperCase()}`)
+      } else {
+        navigate('/')
+      }
+      return
+    }
+
+    if (!code) return
 
     let presenceChannel: any = null
     let dbChannel: any = null
@@ -137,7 +148,7 @@ export const StudentLobby: React.FC = () => {
       if (presenceChannel) supabase.removeChannel(presenceChannel)
       if (dbChannel) supabase.removeChannel(dbChannel)
     }
-  }, [code, user, profile, sessionId, navigate])
+  }, [code, user, profile, authLoading, sessionId, navigate])
 
   if (loading) {
     return (

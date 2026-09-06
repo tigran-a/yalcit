@@ -212,11 +212,11 @@ export const PresenterLobby: React.FC = () => {
         </div>
 
         {/* Giants Code Projection Card */}
-        <div className="p-8 px-16 rounded-3xl glass-panel animate-glow flex flex-col items-center space-y-2 select-all">
-          <span className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">
+        <div className="p-8 px-16 rounded-3xl glass-panel animate-glow flex flex-col items-center space-y-2 select-none">
+          <span className="text-[10px] font-bold text-text-secondary uppercase tracking-widest select-none">
             Room Code
           </span>
-          <span className="text-7xl font-black tracking-widest text-text-primary select-all">
+          <span className="text-7xl font-black tracking-widest text-text-primary select-all cursor-pointer">
             {code?.toUpperCase()}
           </span>
         </div>
