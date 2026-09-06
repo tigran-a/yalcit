@@ -32,6 +32,7 @@ export const StudentQuiz: React.FC = () => {
   // Grading/Reveal States
   const [correctOptionId, setCorrectOptionId] = useState<string | null>(null)
   const [wasCorrect, setWasCorrect] = useState(false)
+  const [pointsGained, setPointsGained] = useState(0)
 
   const timerRef = useRef<any>(null)
   const currentQuestionIdRef = useRef<string | null>(null)
@@ -61,6 +62,7 @@ export const StudentQuiz: React.FC = () => {
       setOpenText('')
       setCorrectOptionId(null)
       setWasCorrect(false)
+      setPointsGained(0)
       
       // Check if student has already submitted an answer to this question (e.g. on refresh)
       const { data: previousResponse } = await supabase
@@ -289,7 +291,7 @@ export const StudentQuiz: React.FC = () => {
       // B. Fetch student's submitted response to verify grading evaluates by database trigger
       const { data: myResponse, error: responseErr } = await supabase
         .from('responses')
-        .select('is_correct')
+        .select('is_correct, points')
         .eq('question_id', questionId)
         .eq('user_id', user?.id)
         .maybeSingle()
@@ -297,8 +299,10 @@ export const StudentQuiz: React.FC = () => {
       if (responseErr) throw responseErr
       if (myResponse) {
         setWasCorrect(myResponse.is_correct)
+        setPointsGained(myResponse.points || 0)
       } else {
         setWasCorrect(false) // Did not answer in time
+        setPointsGained(0)
       }
     } catch (err) {
       console.error('Error fetching correct answer reveal:', err)
@@ -469,7 +473,9 @@ export const StudentQuiz: React.FC = () => {
               <div className="space-y-4">
                 <CheckCircle2 className="w-16 h-16 text-brand-success mx-auto animate-bounce" />
                 <h2 className="text-3xl font-black text-brand-success">Correct!</h2>
-                <p className="text-sm text-text-secondary">Excellent job! You gained +100 points.</p>
+                <p className="text-sm font-bold text-brand-success bg-brand-success/10 px-3 py-1.5 rounded-full inline-block">
+                  + {pointsGained} pts!
+                </p>
               </div>
             ) : (
               <div className="space-y-4">

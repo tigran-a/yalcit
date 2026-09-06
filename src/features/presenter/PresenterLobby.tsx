@@ -211,14 +211,32 @@ export const PresenterLobby: React.FC = () => {
           </div>
         </div>
 
-        {/* Giants Code Projection Card */}
-        <div className="p-8 px-16 rounded-3xl glass-panel animate-glow flex flex-col items-center space-y-2 select-none">
-          <span className="text-[10px] font-bold text-text-secondary uppercase tracking-widest select-none">
-            Room Code
-          </span>
-          <span className="text-7xl font-black tracking-widest text-text-primary select-all cursor-pointer">
-            {code?.toUpperCase()}
-          </span>
+        {/* Giants Code & QR Projection Card */}
+        <div className="p-8 px-12 rounded-3xl glass-panel animate-glow flex flex-col md:flex-row items-center justify-between gap-8 select-none max-w-2xl w-full">
+          <div className="flex flex-col items-center md:items-start space-y-2">
+            <span className="text-[10px] font-bold text-text-secondary uppercase tracking-widest select-none">
+              Room Code
+            </span>
+            <span className="text-6xl sm:text-7xl font-black tracking-widest text-text-primary select-all cursor-pointer">
+              {code?.toUpperCase()}
+            </span>
+            <span className="text-xs font-semibold text-brand-primary-light flex items-center gap-1 pt-1">
+              yalcit.app / session/{code?.toUpperCase()}
+            </span>
+          </div>
+
+          <div className="flex flex-col items-center space-y-1.5 p-3 rounded-2xl bg-white shadow-lg border border-border/80 text-center">
+            <img 
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&color=4f46e5&bgcolor=ffffff&data=${encodeURIComponent(
+                `${window.location.origin}/session/${code?.toUpperCase()}`
+              )}`}
+              alt="Scan to Join"
+              className="w-32 h-32 rounded-lg"
+            />
+            <span className="text-[9px] font-extrabold text-slate-700 uppercase tracking-wider">
+              📷 Scan Camera to Join
+            </span>
+          </div>
         </div>
 
         {/* Connected Students Roster */}

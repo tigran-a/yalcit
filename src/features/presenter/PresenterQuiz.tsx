@@ -256,10 +256,10 @@ export const PresenterQuiz: React.FC = () => {
   const fetchScoreboard = async () => {
     if (!sessionId) return
     try {
-      // Calculate sums of correct responses per student
+      // Calculate sums of correct responses & points per student
       const { data, error: scoreErr } = await supabase
         .from('responses')
-        .select('nickname, is_correct')
+        .select('nickname, is_correct, points')
         .eq('session_id', sessionId)
 
       if (scoreErr) throw scoreErr
@@ -267,7 +267,8 @@ export const PresenterQuiz: React.FC = () => {
       const sums: Record<string, number> = {}
       data.forEach((r: any) => {
         if (!sums[r.nickname]) sums[r.nickname] = 0
-        if (r.is_correct) sums[r.nickname] += 100 // +100 points for correct answer
+        const earned = r.points !== undefined && r.points !== null ? r.points : (r.is_correct ? 100 : 0)
+        sums[r.nickname] += earned
       })
 
       const board: ScoreboardEntry[] = Object.keys(sums).map(key => ({
@@ -297,12 +298,13 @@ export const PresenterQuiz: React.FC = () => {
       setLoading(true)
 
       try {
-        // Update database with new active question id and reset reveal flag
+        // Update database with new active question id and reset reveal flag & start timestamp
         const { error: nextErr } = await supabase
           .from('sessions')
           .update({
             current_question_id: nextQuestion.id,
-            current_question_revealed: false
+            current_question_revealed: false,
+            current_question_started_at: new Date().toISOString()
           })
           .eq('id', sessionId)
 
@@ -405,38 +407,109 @@ export const PresenterQuiz: React.FC = () => {
           <ThemeToggle />
         </div>
       </header>
-
       {/* Main Board projections */}
       <main className="relative z-10 w-full max-w-5xl mx-auto flex-grow flex flex-col justify-center">
         
         {showScoreboard ? (
-          /* SCOREBOARD OVERLAY SCREEN */
-          <div className="p-8 rounded-3xl glass-panel animate-glow space-y-6 max-w-lg mx-auto w-full">
+          /* SCOREBOARD & WINNER PODIUM OVERLAY SCREEN */
+          <div className="p-8 rounded-3xl glass-panel animate-glow space-y-8 max-w-2xl mx-auto w-full">
             <div className="text-center space-y-2">
               <Award className="w-12 h-12 text-brand-accent mx-auto animate-bounce" />
-              <h2 className="text-3xl font-black text-gradient">Leaderboard Standings</h2>
-              <p className="text-xs text-text-secondary">Current scores across all rounds</p>
+              <h2 className="text-3xl font-black text-gradient">
+                {currentQuestionIndex + 1 >= questions.length ? 'Final Winner Podium' : 'Leaderboard Standings'}
+              </h2>
+              <p className="text-xs text-text-secondary">
+                {currentQuestionIndex + 1 >= questions.length 
+                  ? 'Congratulations to the champions!' 
+                  : 'Current scores across all rounds'}
+              </p>
             </div>
 
-            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+            {/* TOP 3 WINNER PODIUM */}
+            {scoreboard.length > 0 && (
+              <div className="flex items-end justify-center gap-3 sm:gap-6 pt-4 pb-2">
+                {/* 2nd Place (Left) */}
+                <div className="flex flex-col items-center space-y-2 w-24 sm:w-32">
+                  {scoreboard[1] ? (
+                    <>
+                      <div className="text-center truncate w-full">
+                        <span className="text-xs font-bold text-slate-300 block truncate">{scoreboard[1].nickname}</span>
+                        <span className="text-[10px] font-mono text-slate-400 block">{scoreboard[1].score} pts</span>
+                      </div>
+                      <div className="w-full h-28 rounded-t-2xl bg-gradient-to-t from-slate-500/20 to-slate-400/30 border-t-4 border-slate-300 flex flex-col items-center justify-start pt-3 shadow-lg">
+                        <span className="w-8 h-8 rounded-full bg-slate-300 text-slate-900 font-black text-xs flex items-center justify-center shadow">
+                          2nd
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="w-full h-28 rounded-t-2xl bg-white/5 border-t-2 border-border/30" />
+                  )}
+                </div>
+
+                {/* 1st Place (Center - Tallest) */}
+                <div className="flex flex-col items-center space-y-2 w-28 sm:w-36">
+                  {scoreboard[0] ? (
+                    <>
+                      <span className="text-2xl animate-bounce">👑</span>
+                      <div className="text-center truncate w-full">
+                        <span className="text-sm font-black text-amber-400 block truncate">{scoreboard[0].nickname}</span>
+                        <span className="text-xs font-mono font-bold text-amber-300 block">{scoreboard[0].score} pts</span>
+                      </div>
+                      <div className="w-full h-36 rounded-t-2xl bg-gradient-to-t from-amber-500/30 to-amber-400/40 border-t-4 border-amber-400 flex flex-col items-center justify-start pt-3 shadow-xl shadow-amber-500/10">
+                        <span className="w-9 h-9 rounded-full bg-amber-400 text-slate-950 font-black text-sm flex items-center justify-center shadow-lg">
+                          1st
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="w-full h-36 rounded-t-2xl bg-white/5 border-t-2 border-border/30" />
+                  )}
+                </div>
+
+                {/* 3rd Place (Right) */}
+                <div className="flex flex-col items-center space-y-2 w-24 sm:w-32">
+                  {scoreboard[2] ? (
+                    <>
+                      <div className="text-center truncate w-full">
+                        <span className="text-xs font-bold text-amber-600 block truncate">{scoreboard[2].nickname}</span>
+                        <span className="text-[10px] font-mono text-amber-700/80 block">{scoreboard[2].score} pts</span>
+                      </div>
+                      <div className="w-full h-20 rounded-t-2xl bg-gradient-to-t from-amber-800/20 to-amber-700/30 border-t-4 border-amber-600 flex flex-col items-center justify-start pt-2 shadow">
+                        <span className="w-7 h-7 rounded-full bg-amber-700 text-white font-black text-xs flex items-center justify-center shadow">
+                          3rd
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="w-full h-20 rounded-t-2xl bg-white/5 border-t-2 border-border/30" />
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* FULL STANDINGS LIST */}
+            <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
               {scoreboard.map((entry, idx) => (
                 <div
                   key={entry.nickname}
-                  className="flex items-center justify-between p-4 rounded-xl bg-white/5 dark:bg-white/5 border border-border"
+                  className="flex items-center justify-between p-3.5 rounded-xl bg-white/5 dark:bg-white/5 border border-border"
                 >
                   <div className="flex items-center gap-3">
                     <span className={`w-6 h-6 rounded-md flex items-center justify-center text-xs font-extrabold ${
                       idx === 0 
-                        ? 'bg-brand-warning/20 text-brand-warning' 
+                        ? 'bg-amber-400/20 text-amber-400' 
                         : idx === 1
-                        ? 'bg-text-secondary/20 text-text-secondary'
+                        ? 'bg-slate-300/20 text-slate-300'
+                        : idx === 2
+                        ? 'bg-amber-700/20 text-amber-600'
                         : 'bg-white/5 text-text-secondary/50'
                     }`}>
                       {idx + 1}
                     </span>
-                    <span className="font-bold text-text-primary">{entry.nickname}</span>
+                    <span className="font-bold text-text-primary text-sm">{entry.nickname}</span>
                   </div>
-                  <span className="font-black text-brand-primary-light font-mono">{entry.score} pts</span>
+                  <span className="font-black text-brand-primary-light font-mono text-sm">{entry.score} pts</span>
                 </div>
               ))}
 
@@ -461,7 +534,7 @@ export const PresenterQuiz: React.FC = () => {
                   onClick={() => navigate('/presenter/dashboard')}
                   className="flex items-center gap-2 px-6 py-3 font-bold rounded-xl bg-gradient-to-r from-brand-primary to-brand-secondary hover:scale-[1.03] transition-all text-sm text-white cursor-pointer"
                 >
-                  Back to Dashboard
+                  Return to Dashboard
                 </button>
               )}
             </div>
