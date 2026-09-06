@@ -43,22 +43,34 @@ export const StudentLobby: React.FC = () => {
 
     const setupRealtime = async () => {
       try {
-        // 1. Fetch Session ID if not present in navigation state
-        let currentSessionId = sessionId
-        if (!currentSessionId) {
-          const { data, error: fetchErr } = await supabase
-            .from('sessions')
-            .select('id, status')
-            .eq('code', code.toUpperCase())
-            .single()
+        // 1. Fetch Session status & ID
+        const { data: sessionData, error: fetchErr } = await supabase
+          .from('sessions')
+          .select('id, status, current_question_id')
+          .eq('code', code.toUpperCase())
+          .single()
 
-          if (fetchErr || !data) {
-            setError('Could not connect to the session. It may have ended.')
-            setLoading(false)
-            return
-          }
-          currentSessionId = data.id
-          setSessionId(data.id)
+        if (fetchErr || !sessionData) {
+          setError('Could not connect to the session. It may have ended.')
+          setLoading(false)
+          return
+        }
+
+        let currentSessionId = sessionData.id
+        setSessionId(sessionData.id)
+
+        // Late Joiner Check: If session is ALREADY active, jump straight to the live quiz!
+        if (sessionData.status === 'active' && sessionData.current_question_id) {
+          navigate(`/session/${code.toUpperCase()}/quiz`, {
+            state: { sessionId: currentSessionId },
+          })
+          return
+        }
+
+        if (sessionData.status === 'ended') {
+          setError('This session has already ended.')
+          setLoading(false)
+          return
         }
 
         setLoading(false)

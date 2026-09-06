@@ -69,8 +69,12 @@ export const JoinSession: React.FC = () => {
       // 2. Perform anonymous authentication
       await signInAnonymously(cleanedNickname)
 
-      // 3. Navigate to student lobby
-      navigate(`/session/${cleanedCode}/lobby`, { state: { sessionId: session.id } })
+      // 3. Navigate: If session is already active, jump directly to the live quiz!
+      if (session.status === 'active') {
+        navigate(`/session/${cleanedCode}/quiz`, { state: { sessionId: session.id } })
+      } else {
+        navigate(`/session/${cleanedCode}/lobby`, { state: { sessionId: session.id } })
+      }
     } catch (err: any) {
       console.error('Error joining session:', err)
       setError(err.message || 'An unexpected error occurred while joining.')
