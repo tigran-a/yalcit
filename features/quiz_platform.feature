@@ -48,3 +48,12 @@ Feature: Yalcit Interactive Quiz Platform
     Then a JSON file containing quiz headers, questions, and correct answers is generated
     When the presenter imports the exported JSON file
     Then two new quiz templates should be created in the presenter's library
+
+  Scenario: Public Demo Quiz Installation & Toggling
+    Given the demo quiz installation is active in the system
+    Then a public quiz titled "🇫🇷 Learn French for Beginners (Demo)" with 12 questions should be available
+    When the presenter disables demo quizzes using the system toggle
+    Then the demo quiz should no longer be public
+    When the presenter enables demo quizzes using the system toggle
+    Then the demo quiz should be public again
+

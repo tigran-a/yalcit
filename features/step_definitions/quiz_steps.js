@@ -629,3 +629,50 @@ Then('two new quiz templates should be created in the presenter\'s library', asy
   const { data: qz2 } = await presenterClient.from('quizzes').select('*').eq('id', this.importedQuizIds[1]).single()
   assert.strictEqual(qz2.title, 'History Intro (Imported)')
 })
+
+Given('the demo quiz installation is active in the system', async function () {
+  await adminClient.rpc('enable_demo_quizzes')
+})
+
+Then('a public quiz titled {string} with {int} questions should be available', async function (title, expectedQuestionCount) {
+  const { data: quiz, error } = await adminClient
+    .from('quizzes')
+    .select('*, questions(*)')
+    .eq('is_demo', true)
+    .single()
+
+  assert.ifError(error)
+  assert.strictEqual(quiz.title, title)
+  assert.strictEqual(quiz.is_public, true)
+  assert.strictEqual(quiz.questions.length, expectedQuestionCount)
+})
+
+When('the presenter disables demo quizzes using the system toggle', async function () {
+  const { error } = await adminClient.rpc('disable_demo_quizzes')
+  assert.ifError(error)
+})
+
+Then('the demo quiz should no longer be public', async function () {
+  const { data: quiz } = await adminClient
+    .from('quizzes')
+    .select('is_public')
+    .eq('is_demo', true)
+    .single()
+
+  assert.strictEqual(quiz.is_public, false)
+})
+
+When('the presenter enables demo quizzes using the system toggle', async function () {
+  const { error } = await adminClient.rpc('enable_demo_quizzes')
+  assert.ifError(error)
+})
+
+Then('the demo quiz should be public again', async function () {
+  const { data: quiz } = await adminClient
+    .from('quizzes')
+    .select('is_public')
+    .eq('is_demo', true)
+    .single()
+
+  assert.strictEqual(quiz.is_public, true)
+})

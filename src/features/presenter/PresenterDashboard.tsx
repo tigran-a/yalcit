@@ -13,6 +13,7 @@ interface Quiz {
   title: string
   created_at: string
   is_public: boolean
+  is_demo?: boolean
   forked_from_id?: string | null
   presenter_id?: string
   profiles?: { display_name: string } | null
@@ -47,6 +48,7 @@ export const PresenterDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [demoEnabled, setDemoEnabled] = useState(true)
 
   // Quiz Creator/Editor Form States
   const [showCreator, setShowCreator] = useState(false)
@@ -124,6 +126,22 @@ export const PresenterDashboard: React.FC = () => {
   useEffect(() => {
     fetchData()
   }, [user])
+
+  const handleToggleDemoQuizzes = async () => {
+    try {
+      const nextState = !demoEnabled
+      if (nextState) {
+        await supabase.rpc('enable_demo_quizzes')
+      } else {
+        await supabase.rpc('disable_demo_quizzes')
+      }
+      setDemoEnabled(nextState)
+      fetchData()
+    } catch (err: any) {
+      console.error('Error toggling demo quizzes:', err)
+      setError('Could not toggle demo quizzes.')
+    }
+  }
 
   // Handles adding empty question fields
   const addQuestion = () => {
@@ -1016,6 +1034,20 @@ export const PresenterDashboard: React.FC = () => {
               </div>
             )}
 
+            {/* Public Quizzes Demo Toggle Controls */}
+            {quizTab === 'public' && (
+              <div className="flex items-center justify-between bg-white/5 border border-border p-2.5 rounded-xl text-[10px] gap-2 mb-3">
+                <span className="font-semibold text-text-secondary">Community & Demo Quizzes</span>
+                <button
+                  onClick={handleToggleDemoQuizzes}
+                  className="px-2.5 py-1 rounded-lg bg-white/5 border border-border hover:bg-white/10 text-text-primary transition-all font-bold flex items-center gap-1.5 cursor-pointer"
+                  title="Enable or disable demo quizzes installation"
+                >
+                  <span>{demoEnabled ? '🇫🇷 Disable Demo Quizzes' : '🇫🇷 Enable Demo Quizzes'}</span>
+                </button>
+              </div>
+            )}
+
             {/* Quizzes List */}
             <div className="space-y-3 max-h-[450px] overflow-y-auto pr-1">
               {/* Own Quizzes */}
@@ -1051,6 +1083,9 @@ export const PresenterDashboard: React.FC = () => {
                         </span>
                         {quiz.forked_from_id && (
                           <span className="text-brand-accent/70 font-semibold italic">Forked</span>
+                        )}
+                        {quiz.is_demo && (
+                          <span className="px-1.5 py-0.5 rounded bg-brand-primary/20 text-brand-primary text-[8px] font-black uppercase">Demo</span>
                         )}
                       </div>
                     </div>
@@ -1103,9 +1138,16 @@ export const PresenterDashboard: React.FC = () => {
                   className="p-3.5 rounded-2xl bg-white/5 dark:bg-white/5 border border-border hover:border-brand-primary/30 flex items-center justify-between transition-all duration-300 text-xs"
                 >
                   <div className="space-y-1 truncate pr-3">
-                    <h3 className="font-extrabold text-text-primary truncate">
-                      {quiz.title}
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-extrabold text-text-primary truncate">
+                        {quiz.title}
+                      </h3>
+                      {quiz.is_demo && (
+                        <span className="px-2 py-0.5 rounded-full bg-brand-primary/20 text-brand-primary-light border border-brand-primary/30 text-[9px] font-extrabold uppercase tracking-wider flex items-center gap-1 flex-shrink-0">
+                          <span>🇫🇷</span> Demo
+                        </span>
+                      )}
+                    </div>
                     <div className="flex flex-col gap-0.5 text-[9px] text-text-secondary">
                       <span>By: {quiz.profiles?.display_name || 'Presenter'}</span>
                       {quiz.forked_from_id && <span className="italic text-brand-accent/50">Derived Quiz</span>}
