@@ -57,3 +57,36 @@ Feature: Yalcit Interactive Quiz Platform
     When the presenter enables demo quizzes using the system toggle
     Then the demo quiz should be public again
 
+  Scenario: Speed-Based Scoring & Standard Scoring Calculation
+    Given a registered presenter "presenter_bdd@gmail.com"
+    And a quiz "Speed Quiz" with a question "Fast Math"
+    When the presenter launches a session with speed-based scoring enabled
+    And a student "FastStudent" joins and submits the correct answer quickly
+    Then the student should be awarded speed bonus points between 500 and 1000
+    When the presenter launches a session with speed-based scoring disabled
+    And a student "StandardStudent" joins and submits the correct answer
+    Then the student should be awarded standard 100 points
+
+  Scenario: Open-Ended Question Realtime Grading
+    Given a registered presenter "presenter_bdd@gmail.com"
+    And a quiz "French Vocabulary" with an open-ended question "What is Thank You?" correct answer "Merci"
+    When a student "LangStudent" joins the active session
+    And the student submits open-ended answer " merci "
+    Then the student answer is graded as "correct" by the database trigger
+
+  Scenario: Student Final Leaderboard & RLS Access on Quiz Completion
+    Given a live session hosted by presenter "presenter_bdd@gmail.com" for quiz "Science Trivia"
+    And students "Alice" and "Bob" have submitted answers
+    When the presenter terminates the session from the dashboard
+    Then student "Alice" should be able to query the ended session leaderboard
+    And the student rank and total points should be accurately calculated
+
+  Scenario: Quiz Template Privacy Toggle and Deletion
+    Given a registered presenter "presenter_bdd@gmail.com"
+    And the presenter creates a private quiz template titled "Secret Quiz"
+    When the presenter toggles privacy for "Secret Quiz" to public
+    Then the quiz template "Secret Quiz" should be public
+    When the presenter deletes the quiz template "Secret Quiz"
+    Then the quiz template "Secret Quiz" should no longer exist in the library
+
+

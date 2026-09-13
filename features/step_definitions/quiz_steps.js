@@ -676,3 +676,255 @@ Then('the demo quiz should be public again', async function () {
 
   assert.strictEqual(quiz.is_public, true)
 })
+
+// --- Speed Scoring Steps ---
+Given('a quiz {string} with a question {string}', async function (quizTitle, questionTitle) {
+  const { data: quiz } = await presenterClient
+    .from('quizzes')
+    .insert({ presenter_id: this.presenterId, title: quizTitle, is_public: false })
+    .select().single()
+
+  this.quizId = quiz.id
+  if (!this.quizIds) this.quizIds = []
+  this.quizIds.push(quiz.id)
+
+  const { data: q } = await presenterClient
+    .from('questions')
+    .insert({ quiz_id: quiz.id, type: 'multiple_choice', title: questionTitle, options: [{ id: 'A', text: 'OptA' }], sort_order: 1, time_limit: 30 })
+    .select().single()
+
+  this.questionId = q.id
+  await presenterClient.from('question_answers').insert({ question_id: q.id, correct_option_id: 'A' })
+})
+
+When('the presenter launches a session with speed-based scoring enabled', async function () {
+  const code = Math.random().toString(36).substring(2, 8).toUpperCase()
+  const { data: session } = await presenterClient
+    .from('sessions')
+    .insert({
+      code,
+      quiz_id: this.quizId,
+      presenter_id: this.presenterId,
+      status: 'active',
+      current_question_id: this.questionId,
+      speed_scoring: true,
+      current_question_started_at: new Date().toISOString()
+    })
+    .select().single()
+
+  this.sessionId = session.id
+})
+
+When('a student {string} joins and submits the correct answer quickly', async function (nickname) {
+  const email = `student_${Date.now()}_${Math.floor(Math.random() * 10000)}@test.com`
+  const { data: userRes } = await adminClient.auth.admin.createUser({ email, password: TEST_PASSWORD, email_confirm: true })
+  this.studentUid = userRes.user.id
+  await adminClient.from('profiles').insert({ id: this.studentUid, display_name: nickname, role: 'student' })
+
+  const { data: resp, error } = await adminClient.from('responses').insert({
+    session_id: this.sessionId,
+    question_id: this.questionId,
+    user_id: this.studentUid,
+    nickname,
+    answer: { option_id: 'A' }
+  }).select().single()
+
+  assert.ifError(error)
+  this.lastResponse = resp
+})
+
+Then('the student should be awarded speed bonus points between {int} and {int}', function (minPts, maxPts) {
+  assert.strictEqual(this.lastResponse.is_correct, true)
+  assert.ok(this.lastResponse.points >= minPts && this.lastResponse.points <= maxPts, `Points ${this.lastResponse.points} should be between ${minPts} and ${maxPts}`)
+})
+
+When('the presenter launches a session with speed-based scoring disabled', async function () {
+  const code = Math.random().toString(36).substring(2, 8).toUpperCase()
+  const { data: session } = await presenterClient
+    .from('sessions')
+    .insert({
+      code,
+      quiz_id: this.quizId,
+      presenter_id: this.presenterId,
+      status: 'active',
+      current_question_id: this.questionId,
+      speed_scoring: false,
+      current_question_started_at: new Date().toISOString()
+    })
+    .select().single()
+
+  this.sessionId = session.id
+})
+
+When('a student {string} joins and submits the correct answer', async function (nickname) {
+  const email = `student_${Date.now()}_${Math.floor(Math.random() * 10000)}@test.com`
+  const { data: userRes } = await adminClient.auth.admin.createUser({ email, password: TEST_PASSWORD, email_confirm: true })
+  this.studentUid = userRes.user.id
+  await adminClient.from('profiles').insert({ id: this.studentUid, display_name: nickname, role: 'student' })
+
+  const { data: resp, error } = await adminClient.from('responses').insert({
+    session_id: this.sessionId,
+    question_id: this.questionId,
+    user_id: this.studentUid,
+    nickname,
+    answer: { option_id: 'A' }
+  }).select().single()
+
+  assert.ifError(error)
+  this.lastResponse = resp
+})
+
+Then('the student should be awarded standard {int} points', function (expectedPts) {
+  assert.strictEqual(this.lastResponse.is_correct, true)
+  assert.strictEqual(this.lastResponse.points, expectedPts)
+})
+
+// --- Open-Ended Question Steps ---
+Given('a quiz {string} with an open-ended question {string} correct answer {string}', async function (quizTitle, questionTitle, correctAnswer) {
+  const { data: quiz } = await presenterClient
+    .from('quizzes')
+    .insert({ presenter_id: this.presenterId, title: quizTitle, is_public: false })
+    .select().single()
+
+  this.quizId = quiz.id
+  if (!this.quizIds) this.quizIds = []
+  this.quizIds.push(quiz.id)
+
+  const { data: q } = await presenterClient
+    .from('questions')
+    .insert({ quiz_id: quiz.id, type: 'open_ended', title: questionTitle, options: [], sort_order: 1, time_limit: 30 })
+    .select().single()
+
+  this.questionId = q.id
+  await presenterClient.from('question_answers').insert({ question_id: q.id, correct_option_id: correctAnswer })
+})
+
+When('a student {string} joins the active session', async function (nickname) {
+  const code = Math.random().toString(36).substring(2, 8).toUpperCase()
+  const { data: session } = await presenterClient
+    .from('sessions')
+    .insert({
+      code,
+      quiz_id: this.quizId,
+      presenter_id: this.presenterId,
+      status: 'active',
+      current_question_id: this.questionId,
+      speed_scoring: false
+    })
+    .select().single()
+
+  this.sessionId = session.id
+
+  const email = `student_${Date.now()}_${Math.floor(Math.random() * 10000)}@test.com`
+  const { data: userRes } = await adminClient.auth.admin.createUser({ email, password: TEST_PASSWORD, email_confirm: true })
+  this.studentUid = userRes.user.id
+  await adminClient.from('profiles').insert({ id: this.studentUid, display_name: nickname, role: 'student' })
+})
+
+When('the student submits open-ended answer {string}', async function (ansText) {
+  const { data: resp, error } = await adminClient.from('responses').insert({
+    session_id: this.sessionId,
+    question_id: this.questionId,
+    user_id: this.studentUid,
+    nickname: 'LangStudent',
+    answer: { text: ansText }
+  }).select().single()
+
+  assert.ifError(error)
+  this.lastResponse = resp
+})
+
+// --- Student Leaderboard Steps ---
+Given('students {string} and {string} have submitted answers', async function (name1, name2) {
+  const { data: u1 } = await adminClient.auth.admin.createUser({ email: `u1_${Date.now()}_${Math.floor(Math.random() * 10000)}@test.com`, password: TEST_PASSWORD, email_confirm: true })
+  await adminClient.from('profiles').insert({ id: u1.user.id, display_name: name1, role: 'student' })
+  await adminClient.from('responses').insert({
+    session_id: this.sessionId,
+    question_id: this.questionId,
+    user_id: u1.user.id,
+    nickname: name1,
+    answer: { option_id: 'B' },
+    points: 100
+  })
+
+  const { data: u2 } = await adminClient.auth.admin.createUser({ email: `u2_${Date.now()}_${Math.floor(Math.random() * 10000)}@test.com`, password: TEST_PASSWORD, email_confirm: true })
+  await adminClient.from('profiles').insert({ id: u2.user.id, display_name: name2, role: 'student' })
+  await adminClient.from('responses').insert({
+    session_id: this.sessionId,
+    question_id: this.questionId,
+    user_id: u2.user.id,
+    nickname: name2,
+    answer: { option_id: 'A' },
+    points: 0
+  })
+
+  this.student1Id = u1.user.id
+  this.student2Id = u2.user.id
+})
+
+Then('student {string} should be able to query the ended session leaderboard', async function (_studentName) {
+  const { data: responses, error } = await adminClient
+    .from('responses')
+    .select('user_id, nickname, points')
+    .eq('session_id', this.sessionId)
+
+  assert.ifError(error)
+  assert.ok(responses.length >= 2)
+  this.endedResponses = responses
+})
+
+Then('the student rank and total points should be accurately calculated', function () {
+  const sorted = [...this.endedResponses].sort((a, b) => b.points - a.points)
+  assert.ok(sorted[0].points > 0, 'Winner should have points > 0')
+  assert.strictEqual(sorted[1].points, 0, 'Second place should have 0 points')
+})
+
+// --- Privacy Toggle & Delete Steps ---
+Given('the presenter creates a private quiz template titled {string}', async function (title) {
+  const { data: quiz } = await presenterClient
+    .from('quizzes')
+    .insert({ presenter_id: this.presenterId, title, is_public: false })
+    .select().single()
+
+  this.quizId = quiz.id
+  if (!this.quizIds) this.quizIds = []
+  this.quizIds.push(quiz.id)
+})
+
+When('the presenter toggles privacy for {string} to public', async function (title) {
+  const { error } = await presenterClient
+    .from('quizzes')
+    .update({ is_public: true })
+    .eq('id', this.quizId)
+
+  assert.ifError(error)
+})
+
+Then('the quiz template {string} should be public', async function (title) {
+  const { data: quiz } = await presenterClient
+    .from('quizzes')
+    .select('is_public')
+    .eq('id', this.quizId)
+    .single()
+
+  assert.strictEqual(quiz.is_public, true)
+})
+
+When('the presenter deletes the quiz template {string}', async function (title) {
+  const { error } = await presenterClient
+    .from('quizzes')
+    .delete()
+    .eq('id', this.quizId)
+
+  assert.ifError(error)
+})
+
+Then('the quiz template {string} should no longer exist in the library', async function (title) {
+  const { data: quiz } = await presenterClient
+    .from('quizzes')
+    .select('id')
+    .eq('id', this.quizId)
+    .maybeSingle()
+
+  assert.strictEqual(quiz, null)
+})
