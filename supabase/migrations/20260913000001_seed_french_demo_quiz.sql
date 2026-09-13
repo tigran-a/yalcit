@@ -1,7 +1,8 @@
 -- =========================================================================
 -- MIGRATION: 20260913000001_seed_french_demo_quiz.sql
 -- Description: Adds optional is_demo column, SQL toggle functions, and seeds
---              a 12-question "Learn French for Beginners (Demo)" public quiz.
+--              a 12-question "Learn French for Beginners (Demo)" public quiz
+--              using reliable Unsplash CDN image URLs.
 -- =========================================================================
 
 -- 1. Add is_demo column to public.quizzes if it does not exist
@@ -71,7 +72,7 @@ begin
   values (
     v_q1, v_quiz_id, 'multiple_choice',
     'What is the French word for ''Apple''?',
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/Red_Apple.jpg/640px-Red_Apple.jpg',
+    'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=800&auto=format&fit=crop&q=80',
     '[{"id":"A","text":"La pomme"},{"id":"B","text":"La poire"},{"id":"C","text":"La banane"},{"id":"D","text":"L''orange"}]'::jsonb,
     30, 1
   );
@@ -83,12 +84,12 @@ begin
   values (
     v_q2, v_quiz_id, 'multiple_choice',
     'Which of these option pictures represents ''Le Chat'' (The Cat)?',
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Red_Kitten_01.jpg/640px-Red_Kitten_01.jpg',
+    'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=800&auto=format&fit=crop&q=80',
     '[
-      {"id":"A","text":"Le chat","image_url":"https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Cat03.jpg/640px-Cat03.jpg"},
-      {"id":"B","text":"Le chien","image_url":"https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/YellowLabradorLooking_new.jpg/640px-YellowLabradorLooking_new.jpg"},
-      {"id":"C","text":"Le lapin","image_url":"https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/Oryctolagus_cuniculus_Tasmania_2.jpg/640px-Oryctolagus_cuniculus_Tasmania_2.jpg"},
-      {"id":"D","text":"L''oiseau","image_url":"https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Eopsaltria_australis_-_Austinmer.jpg/640px-Eopsaltria_australis_-_Austinmer.jpg"}
+      {"id":"A","text":"Le chat","image_url":"https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=600&auto=format&fit=crop&q=80"},
+      {"id":"B","text":"Le chien","image_url":"https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=600&auto=format&fit=crop&q=80"},
+      {"id":"C","text":"Le lapin","image_url":"https://images.unsplash.com/photo-1585110396000-c9ffd4e4b308?w=600&auto=format&fit=crop&q=80"},
+      {"id":"D","text":"L''oiseau","image_url":"https://images.unsplash.com/photo-1444464666168-49d633b86797?w=600&auto=format&fit=crop&q=80"}
     ]'::jsonb,
     30, 2
   );
@@ -100,7 +101,7 @@ begin
   values (
     v_q3, v_quiz_id, 'multiple_choice',
     'What does ''Bonjour'' mean in English?',
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Eiffel_Tower_from_the_Tour_Montparnasse3.jpg/640px-Eiffel_Tower_from_the_Tour_Montparnasse3.jpg',
+    'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=800&auto=format&fit=crop&q=80',
     '[{"id":"A","text":"Hello / Good morning"},{"id":"B","text":"Good night"},{"id":"C","text":"Thank you"},{"id":"D","text":"Goodbye"}]'::jsonb,
     20, 3
   );
@@ -112,7 +113,7 @@ begin
   values (
     v_q4, v_quiz_id, 'multiple_choice',
     'What is the French word for ''Bread''?',
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/Baguette_de_pain.jpg/640px-Baguette_de_pain.jpg',
+    'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80',
     '[{"id":"A","text":"Le pain"},{"id":"B","text":"Le fromage"},{"id":"C","text":"Le beurre"},{"id":"D","text":"Le gâteau"}]'::jsonb,
     30, 4
   );
@@ -124,7 +125,7 @@ begin
   values (
     v_q5, v_quiz_id, 'multiple_choice',
     'How do you say ''Car'' in French?',
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/2019_Toyota_Corolla_Icon_Tech_VVT-i_Hybrid_1.8.jpg/640px-2019_Toyota_Corolla_Icon_Tech_VVT-i_Hybrid_1.8.jpg',
+    'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=800&auto=format&fit=crop&q=80',
     '[{"id":"A","text":"La voiture"},{"id":"B","text":"Le vélo"},{"id":"C","text":"Le train"},{"id":"D","text":"L''avion"}]'::jsonb,
     30, 5
   );
@@ -136,7 +137,7 @@ begin
   values (
     v_q6, v_quiz_id, 'multiple_choice',
     'What color is ''Rouge'' in English?',
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/Red_square.svg/640px-Red_square.svg.png',
+    'https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=800&auto=format&fit=crop&q=80',
     '[{"id":"A","text":"Red"},{"id":"B","text":"Blue"},{"id":"C","text":"Green"},{"id":"D","text":"Yellow"}]'::jsonb,
     20, 6
   );
@@ -148,7 +149,7 @@ begin
   values (
     v_q7, v_quiz_id, 'multiple_choice',
     'What is ''The Sun'' called in French?',
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/The_Sun_by_the_Atmospheric_Imaging_Assembly_of_NASA%27s_Solar_Dynamics_Observatory_-_20100819.jpg/640px-The_Sun_by_the_Atmospheric_Imaging_Assembly_of_NASA%27s_Solar_Dynamics_Observatory_-_20100819.jpg',
+    'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=800&auto=format&fit=crop&q=80',
     '[{"id":"A","text":"Le soleil"},{"id":"B","text":"La lune"},{"id":"C","text":"L''étoile"},{"id":"D","text":"Le ciel"}]'::jsonb,
     30, 7
   );
@@ -160,7 +161,7 @@ begin
   values (
     v_q8, v_quiz_id, 'multiple_choice',
     'What English word translates to ''L''eau''?',
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Glass_of_water.jpg/640px-Glass_of_water.jpg',
+    'https://images.unsplash.com/photo-1548839140-29a749e1bc4e?w=800&auto=format&fit=crop&q=80',
     '[{"id":"A","text":"Water"},{"id":"B","text":"Milk"},{"id":"C","text":"Coffee"},{"id":"D","text":"Tea"}]'::jsonb,
     20, 8
   );
@@ -172,7 +173,7 @@ begin
   values (
     v_q9, v_quiz_id, 'open_ended',
     'Which French word means ''Thank you''?',
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Gratitude_Thank_You.jpg/640px-Gratitude_Thank_You.jpg',
+    'https://images.unsplash.com/photo-1528642474498-1af0c17fd8c3?w=800&auto=format&fit=crop&q=80',
     '[]'::jsonb,
     30, 9
   );
@@ -184,7 +185,7 @@ begin
   values (
     v_q10, v_quiz_id, 'multiple_choice',
     'What is the French number for ''3''?',
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Number_3_in_yellow_circle.svg/640px-Number_3_in_yellow_circle.svg.png',
+    'https://images.unsplash.com/photo-1555680202-c86f0e12f086?w=800&auto=format&fit=crop&q=80',
     '[{"id":"A","text":"Trois"},{"id":"B","text":"Un"},{"id":"C","text":"Deux"},{"id":"D","text":"Quatre"}]'::jsonb,
     20, 10
   );
@@ -196,7 +197,7 @@ begin
   values (
     v_q11, v_quiz_id, 'multiple_choice',
     'What is the French word for ''Book''?',
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b6/Gutenberg_Bible%2C_Lenox_Copy%2C_New_York_Public_Library%2C_2009._Pic_01.jpg/640px-Gutenberg_Bible%2C_Lenox_Copy%2C_New_York_Public_Library%2C_2009._Pic_01.jpg',
+    'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=800&auto=format&fit=crop&q=80',
     '[{"id":"A","text":"Le livre"},{"id":"B","text":"Le stylo"},{"id":"C","text":"Le cahier"},{"id":"D","text":"La table"}]'::jsonb,
     30, 11
   );
@@ -208,7 +209,7 @@ begin
   values (
     v_q12, v_quiz_id, 'multiple_choice',
     'How do you say ''Goodbye'' in French?',
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Waving_hand_icon.svg/640px-Waving_hand_icon.svg.png',
+    'https://images.unsplash.com/photo-1516726817505-f5ed825624d8?w=800&auto=format&fit=crop&q=80',
     '[{"id":"A","text":"Au revoir"},{"id":"B","text":"S''il vous plaît"},{"id":"C","text":"Bienvenue"},{"id":"D","text":"Bonne nuit"}]'::jsonb,
     20, 12
   );

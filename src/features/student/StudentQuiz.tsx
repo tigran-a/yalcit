@@ -373,6 +373,7 @@ export const StudentQuiz: React.FC = () => {
                     src={activeQuestion.image_url} 
                     alt="Question context" 
                     className="w-full h-full object-cover" 
+                    referrerPolicy="no-referrer"
                     onError={(e) => {
                       e.currentTarget.style.display = 'none';
                     }}
@@ -402,6 +403,7 @@ export const StudentQuiz: React.FC = () => {
                           src={opt.image_url} 
                           alt={`Option ${opt.id}`} 
                           className="w-full h-full object-cover" 
+                          referrerPolicy="no-referrer"
                           onError={(e) => {
                             e.currentTarget.style.display = 'none';
                           }}
@@ -519,6 +521,7 @@ export const StudentQuiz: React.FC = () => {
                             src={matchedOpt.image_url} 
                             alt={`Correct option ${correctOptionId}`} 
                             className="w-full h-full object-cover" 
+                            referrerPolicy="no-referrer"
                             onError={(e) => {
                               e.currentTarget.style.display = 'none';
                             }}
