@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Loader2, Clock, CheckCircle2, XCircle, Smile } from 'lucide-react'
+import { Loader2, Clock, CheckCircle2, XCircle, Trophy, Sparkles } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../contexts/AuthContext'
 import { ThemeToggle } from '../../components/ThemeToggle'
@@ -33,6 +33,12 @@ export const StudentQuiz: React.FC = () => {
   const [correctOptionId, setCorrectOptionId] = useState<string | null>(null)
   const [wasCorrect, setWasCorrect] = useState(false)
   const [pointsGained, setPointsGained] = useState(0)
+
+  // Final Leaderboard States
+  const [finalLeaderboard, setFinalLeaderboard] = useState<any[]>([])
+  const [myRank, setMyRank] = useState<number | null>(null)
+  const [myScore, setMyScore] = useState(0)
+  const [fetchingLeaderboard, setFetchingLeaderboard] = useState(false)
 
   const timerRef = useRef<any>(null)
   const currentQuestionIdRef = useRef<string | null>(null)
@@ -100,6 +106,47 @@ export const StudentQuiz: React.FC = () => {
     }
   }
 
+  // Fetch final leaderboard & standings when quiz ends
+  const fetchFinalLeaderboard = async (sessId: string) => {
+    try {
+      setFetchingLeaderboard(true)
+      const { data: responses, error: err } = await supabase
+        .from('responses')
+        .select('user_id, nickname, points')
+        .eq('session_id', sessId)
+
+      if (err) throw err
+
+      const map: Record<string, { nickname: string; score: number; userId: string }> = {}
+      responses?.forEach(r => {
+        const uid = r.user_id || r.nickname
+        if (!map[uid]) {
+          map[uid] = { nickname: r.nickname || 'Student', score: 0, userId: uid }
+        }
+        map[uid].score += (r.points || 0)
+      })
+
+      const sorted = Object.values(map).sort((a, b) => b.score - a.score)
+      const ranked = sorted.map((item, index) => ({
+        ...item,
+        rank: index + 1,
+        isMe: item.userId === user?.id
+      }))
+
+      setFinalLeaderboard(ranked)
+
+      const me = ranked.find(r => r.isMe)
+      if (me) {
+        setMyRank(me.rank)
+        setMyScore(me.score)
+      }
+    } catch (e) {
+      console.error('Error fetching final student leaderboard:', e)
+    } finally {
+      setFetchingLeaderboard(false)
+    }
+  }
+
   // 2. Initial Setup: fetch session details & join realtime updates
   useEffect(() => {
     if (authLoading) return
@@ -149,6 +196,7 @@ export const StudentQuiz: React.FC = () => {
           await fetchActiveQuestionDetails(sessionData.current_question_id, sessionData.id)
         } else if (sessionData.status === 'ended') {
           setFlowState('ended')
+          await fetchFinalLeaderboard(sessionData.id)
         }
 
         setLoading(false)
@@ -171,6 +219,7 @@ export const StudentQuiz: React.FC = () => {
               if (updatedSession.status === 'ended') {
                 setFlowState('ended')
                 setTimerActive(false)
+                await fetchFinalLeaderboard(sessionData.id)
                 return
               }
 
@@ -546,19 +595,147 @@ export const StudentQuiz: React.FC = () => {
         )}
 
         {flowState === 'ended' && (
-          /* End of Quiz Screen */
-          <div className="p-8 rounded-3xl glass-panel text-center space-y-6 max-w-md mx-auto w-full">
-            <Smile className="w-16 h-16 text-brand-accent mx-auto animate-bounce mb-2" />
-            <h2 className="text-3xl font-black text-gradient">Quiz Completed!</h2>
-            <p className="text-sm text-text-secondary">
-              The presenter has ended the session. Look at the main screen for the final standings and winner podium!
-            </p>
-            <button
-              onClick={() => navigate('/')}
-              className="px-6 py-3 font-semibold rounded-xl bg-white/10 dark:bg-white/5 border border-border hover:bg-white/15 dark:hover:bg-white/10 transition-all text-text-primary text-sm cursor-pointer"
-            >
-              Back to Home
-            </button>
+          /* End of Quiz Screen with Leaderboard & Standings */
+          <div className="p-8 rounded-3xl glass-panel text-center space-y-8 max-w-xl mx-auto w-full animate-glow">
+            {/* Hero Header */}
+            <div className="space-y-3">
+              <div className="relative inline-block">
+                <Trophy className="w-16 h-16 text-yellow-400 mx-auto animate-bounce drop-shadow-md" />
+                <Sparkles className="w-6 h-6 text-brand-accent absolute -top-1 -right-2 animate-pulse" />
+              </div>
+              
+              <h2 className="text-3xl font-black text-gradient">Quiz Completed!</h2>
+              
+              {myRank !== null ? (
+                <div className="inline-flex flex-col items-center gap-1 bg-white/5 border border-border px-6 py-3.5 rounded-2xl shadow-inner">
+                  <span className="text-[10px] font-extrabold text-text-secondary uppercase tracking-wider">Your Final Standings</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl font-black text-brand-primary-light">
+                      #{myRank} Place
+                    </span>
+                    <span className="text-xs font-bold text-brand-success bg-brand-success/10 border border-brand-success/20 px-3 py-1 rounded-full">
+                      +{myScore} pts
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-text-secondary">Out of {finalLeaderboard.length} participant{finalLeaderboard.length === 1 ? '' : 's'}</span>
+                </div>
+              ) : (
+                <p className="text-sm text-text-secondary">
+                  The presenter has ended the session. Great job participating!
+                </p>
+              )}
+            </div>
+
+            {fetchingLeaderboard ? (
+              <div className="flex flex-col items-center gap-2 py-6">
+                <Loader2 className="w-8 h-8 animate-spin text-brand-primary-light" />
+                <span className="text-xs text-text-secondary font-semibold">Calculating final standings...</span>
+              </div>
+            ) : (
+              <div className="space-y-6 text-left">
+                {/* Top 3 Podium Cards */}
+                {finalLeaderboard.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary text-center">
+                      🏆 Winners Podium
+                    </h3>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {finalLeaderboard.slice(0, 3).map((student) => {
+                        const is1st = student.rank === 1
+                        const is2nd = student.rank === 2
+
+                        return (
+                          <div
+                            key={student.userId || student.nickname}
+                            className={`p-3.5 rounded-2xl border text-center relative flex flex-col items-center justify-between transition-all ${
+                              student.isMe ? 'ring-2 ring-brand-primary shadow-lg' : ''
+                            } ${
+                              is1st
+                                ? 'bg-amber-500/10 border-amber-500/30'
+                                : is2nd
+                                ? 'bg-slate-400/10 border-slate-400/30'
+                                : 'bg-amber-700/10 border-amber-700/30'
+                            }`}
+                          >
+                            <span className="text-xl mb-1">
+                              {is1st ? '🥇' : is2nd ? '🥈' : '🥉'}
+                            </span>
+                            <span className="text-xs font-black text-text-primary truncate w-full">
+                              {student.nickname}
+                              {student.isMe && <span className="ml-1 text-[9px] text-brand-primary">(You)</span>}
+                            </span>
+                            <span className="text-[10px] font-bold text-text-secondary mt-1">
+                              {student.score} pts
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Nearby Competitors / Class Standings */}
+                {finalLeaderboard.length > 0 && (
+                  <div className="space-y-3 pt-2">
+                    <h3 className="text-[10px] font-extrabold uppercase tracking-wider text-text-secondary text-center">
+                      📊 Class Standings & Neighbor Ranks
+                    </h3>
+
+                    <div className="space-y-2">
+                      {(() => {
+                        let displayList = []
+                        if (myRank && myRank <= 3) {
+                          displayList = finalLeaderboard.slice(0, Math.min(5, finalLeaderboard.length))
+                        } else if (myRank) {
+                          const minIdx = Math.max(0, myRank - 2)
+                          const maxIdx = Math.min(finalLeaderboard.length, myRank + 1)
+                          displayList = finalLeaderboard.slice(minIdx, maxIdx)
+                        } else {
+                          displayList = finalLeaderboard.slice(0, 5)
+                        }
+
+                        return displayList.map((st) => (
+                          <div
+                            key={st.userId || st.nickname}
+                            className={`p-3 rounded-xl border flex items-center justify-between transition-all ${
+                              st.isMe
+                                ? 'bg-brand-primary/20 border-brand-primary text-text-primary shadow-md font-bold'
+                                : 'bg-white/5 border-border text-text-secondary text-xs'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <span className={`w-6 h-6 rounded-lg text-xs font-extrabold flex items-center justify-center ${
+                                st.isMe ? 'bg-brand-primary text-white' : 'bg-white/10 text-text-secondary'
+                              }`}>
+                                #{st.rank}
+                              </span>
+                              <span className="truncate max-w-[160px]">
+                                {st.nickname}
+                                {st.isMe && <span className="ml-1.5 text-[9px] text-brand-primary-light uppercase font-black">(You)</span>}
+                              </span>
+                            </div>
+
+                            <span className="font-extrabold text-xs">
+                              {st.score} pts
+                            </span>
+                          </div>
+                        ))
+                      })()}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="pt-2">
+              <button
+                onClick={() => navigate('/')}
+                className="w-full py-3.5 font-bold rounded-xl bg-gradient-to-r from-brand-primary to-brand-secondary hover:scale-[1.02] active:scale-[0.98] transition-all text-sm text-white shadow-lg cursor-pointer"
+              >
+                Back to Home
+              </button>
+            </div>
           </div>
         )}
         {/* Realtime Connection Status Toast */}
