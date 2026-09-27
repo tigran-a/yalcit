@@ -33,6 +33,7 @@ export const StudentQuiz: React.FC = () => {
   const [correctOptionId, setCorrectOptionId] = useState<string | null>(null)
   const [wasCorrect, setWasCorrect] = useState(false)
   const [pointsGained, setPointsGained] = useState(0)
+  const [revealLoading, setRevealLoading] = useState(false)
 
   // Final Leaderboard States
   const [finalLeaderboard, setFinalLeaderboard] = useState<any[]>([])
@@ -43,11 +44,32 @@ export const StudentQuiz: React.FC = () => {
   const timerRef = useRef<any>(null)
   const currentQuestionIdRef = useRef<string | null>(null)
 
+  // Helper handlers to save unsubmitted draft answer to localStorage (persists across tab switches/refreshes)
+  const handleSelectOption = (optId: string) => {
+    setSelectedOption(optId)
+    if (currentQuestionIdRef.current) {
+      try {
+        localStorage.setItem(`yalcit_draft_${currentQuestionIdRef.current}`, JSON.stringify({ option_id: optId }))
+      } catch (e) {}
+    }
+  }
+
+  const handleOpenTextChange = (text: string) => {
+    setOpenText(text)
+    if (currentQuestionIdRef.current) {
+      try {
+        localStorage.setItem(`yalcit_draft_${currentQuestionIdRef.current}`, JSON.stringify({ text }))
+      } catch (e) {}
+    }
+  }
+
   // 1. Fetch Session Info & Current Question Details
   const fetchActiveQuestionDetails = async (questionId: string, sessId: string) => {
     try {
       setLoading(true)
       
+      const isSameQuestion = currentQuestionIdRef.current === questionId
+
       // Fetch details of the active question and current session reveal status
       const [questionRes, sessionRes] = await Promise.all([
         supabase.from('questions').select('*').eq('id', questionId).single(),
@@ -63,12 +85,14 @@ export const StudentQuiz: React.FC = () => {
       currentQuestionIdRef.current = question.id
       setCurrentQuestionIndex(question.sort_order - 1)
       
-      // Reset student answer inputs for the new question
-      setSelectedOption(null)
-      setOpenText('')
-      setCorrectOptionId(null)
-      setWasCorrect(false)
-      setPointsGained(0)
+      // Only reset inputs if moving to a DIFFERENT question
+      if (!isSameQuestion) {
+        setSelectedOption(null)
+        setOpenText('')
+        setCorrectOptionId(null)
+        setWasCorrect(false)
+        setPointsGained(0)
+      }
       
       // Check if student has already submitted an answer to this question (e.g. on refresh)
       const { data: previousResponse } = await supabase
@@ -83,6 +107,19 @@ export const StudentQuiz: React.FC = () => {
           setSelectedOption(previousResponse.answer?.option_id || null)
         } else {
           setOpenText(previousResponse.answer?.text || '')
+        }
+      } else if (!isSameQuestion) {
+        // Check for local draft saved before tab switch/refresh
+        const savedDraftStr = localStorage.getItem(`yalcit_draft_${questionId}`)
+        if (savedDraftStr) {
+          try {
+            const parsed = JSON.parse(savedDraftStr)
+            if (question.type === 'multiple_choice' && parsed.option_id) {
+              setSelectedOption(parsed.option_id)
+            } else if (question.type === 'open_ended' && parsed.text) {
+              setOpenText(parsed.text)
+            }
+          } catch (e) {}
         }
       }
 
@@ -312,6 +349,12 @@ export const StudentQuiz: React.FC = () => {
       } else {
         setFlowState('submitted')
       }
+
+      if (activeQuestion?.id) {
+        try {
+          localStorage.removeItem(`yalcit_draft_${activeQuestion.id}`)
+        } catch (e) {}
+      }
     } catch (err: any) {
       console.error('Submit answer error:', err)
       setError('Could not submit answer. Please retry.')
@@ -324,6 +367,7 @@ export const StudentQuiz: React.FC = () => {
   // 5. Fetch correct answer and grading info once revealed by presenter
   const handleRevealAnswer = async (questionId: string, _sessId: string) => {
     setTimerActive(false)
+    setRevealLoading(true)
     try {
       // A. Fetch correct answer (unlocked by RLS now that session.current_question_revealed = true)
       const { data: answerData, error: answerErr } = await supabase
@@ -353,10 +397,13 @@ export const StudentQuiz: React.FC = () => {
         setWasCorrect(false) // Did not answer in time
         setPointsGained(0)
       }
+      
+      setFlowState('revealed')
     } catch (err) {
       console.error('Error fetching correct answer reveal:', err)
-    } finally {
       setFlowState('revealed')
+    } finally {
+      setRevealLoading(false)
     }
   }
 
@@ -439,7 +486,7 @@ export const StudentQuiz: React.FC = () => {
                 {activeQuestion.options.map((opt: any) => (
                   <button
                     key={opt.id}
-                    onClick={() => setSelectedOption(opt.id)}
+                    onClick={() => handleSelectOption(opt.id)}
                     className={`p-3 rounded-2xl border text-left font-bold text-text-primary transition-all duration-200 cursor-pointer flex flex-col gap-2.5 ${
                       selectedOption === opt.id
                         ? 'bg-brand-primary/20 border-brand-primary text-brand-primary-light shadow-lg'
@@ -479,7 +526,7 @@ export const StudentQuiz: React.FC = () => {
                   type="text"
                   placeholder="Type your answer here..."
                   value={openText}
-                  onChange={(e) => setOpenText(e.target.value)}
+                  onChange={(e) => handleOpenTextChange(e.target.value)}
                   className="w-full px-5 py-4 rounded-2xl bg-white/5 dark:bg-white/5 border border-border focus:border-brand-primary/50 text-text-primary text-center text-lg font-medium placeholder:text-text-secondary/40 focus:outline-none transition-all duration-300"
                   maxLength={50}
                   required
@@ -518,27 +565,36 @@ export const StudentQuiz: React.FC = () => {
         )}
 
         {flowState === 'revealed' && (
-          /* Results/Correction Reveal Screen */
-          <div className="p-8 rounded-3xl glass-panel animate-glow text-center space-y-8 max-w-md mx-auto w-full">
-            {wasCorrect ? (
-              <div className="space-y-4">
-                <CheckCircle2 className="w-16 h-16 text-brand-success mx-auto animate-bounce" />
-                <h2 className="text-3xl font-black text-brand-success">Correct!</h2>
-                <p className="text-sm font-bold text-brand-success bg-brand-success/10 px-3 py-1.5 rounded-full inline-block">
-                  + {pointsGained} pts!
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <XCircle className="w-16 h-16 text-brand-error mx-auto" />
-                <h2 className="text-3xl font-black text-brand-error">Incorrect</h2>
-                <p className="text-sm text-text-secondary">
-                  {selectedOption || openText.trim()
-                    ? `Oops! Better luck next time.`
-                    : 'Time expired! You didn\'t submit an answer.'}
-                </p>
-              </div>
-            )}
+          revealLoading ? (
+            <div className="p-8 rounded-3xl glass-panel text-center space-y-6 max-w-md mx-auto w-full">
+              <Loader2 className="w-12 h-12 text-brand-primary-light animate-spin mx-auto" />
+              <h2 className="text-2xl font-black text-text-primary">Syncing Results...</h2>
+              <p className="text-sm text-text-secondary">
+                Evaluating answer correctness and points...
+              </p>
+            </div>
+          ) : (
+            /* Results/Correction Reveal Screen */
+            <div className="p-8 rounded-3xl glass-panel animate-glow text-center space-y-8 max-w-md mx-auto w-full">
+              {wasCorrect ? (
+                <div className="space-y-4">
+                  <CheckCircle2 className="w-16 h-16 text-brand-success mx-auto animate-bounce" />
+                  <h2 className="text-3xl font-black text-brand-success">Correct!</h2>
+                  <p className="text-sm font-bold text-brand-success bg-brand-success/10 px-3 py-1.5 rounded-full inline-block">
+                    + {pointsGained} pts!
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <XCircle className="w-16 h-16 text-brand-error mx-auto" />
+                  <h2 className="text-3xl font-black text-brand-error">Incorrect</h2>
+                  <p className="text-sm text-text-secondary">
+                    {selectedOption || openText.trim()
+                      ? `Oops! Better luck next time.`
+                      : 'Time expired! You didn\'t submit an answer.'}
+                  </p>
+                </div>
+              )}
 
             {correctOptionId && (() => {
               const matchedOpt = activeQuestion?.type === 'multiple_choice'
@@ -592,7 +648,8 @@ export const StudentQuiz: React.FC = () => {
               <span>Waiting for presenter to advance...</span>
             </div>
           </div>
-        )}
+        )
+      )}
 
         {flowState === 'ended' && (
           /* End of Quiz Screen with Leaderboard & Standings */

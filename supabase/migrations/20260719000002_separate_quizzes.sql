@@ -71,6 +71,13 @@ alter table public.question_answers enable row level security;
 alter table public.sessions enable row level security;
 alter table public.responses enable row level security;
 
+-- Grants for Data API access (PostgREST)
+grant select, insert, update, delete on public.quizzes to anon, authenticated, service_role;
+grant select, insert, update, delete on public.questions to anon, authenticated, service_role;
+grant select, insert, update, delete on public.question_answers to anon, authenticated, service_role;
+grant select, insert, update, delete on public.sessions to anon, authenticated, service_role;
+grant select, insert, update, delete on public.responses to anon, authenticated, service_role;
+
 -- =========================================================================
 -- 3. DEFINE SECURITY POLICIES
 -- =========================================================================

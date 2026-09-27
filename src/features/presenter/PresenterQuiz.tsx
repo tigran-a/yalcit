@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Loader2, Award, Clock, ArrowRight, Check, Users } from 'lucide-react'
+import { Loader2, Award, Clock, ArrowRight, Check, Users, Square, Zap } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Cell, ResponsiveContainer } from 'recharts'
 import confetti from 'canvas-confetti'
 import { supabase } from '../../lib/supabaseClient'
@@ -588,10 +588,24 @@ export const PresenterQuiz: React.FC = () => {
                 <div className="space-y-2">
                   {!questionRevealed ? (
                     <button
-                      onClick={handleCloseQuestionAndReveal}
-                      className="w-full py-3.5 rounded-xl font-extrabold text-sm text-white bg-gradient-to-r from-brand-primary to-brand-secondary hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer shadow-md shadow-brand-primary/10"
+                      onClick={() => {
+                        setTimeLeft(0)
+                        setTimerActive(false)
+                        handleCloseQuestionAndReveal()
+                      }}
+                      className="w-full py-3.5 rounded-xl font-extrabold text-sm text-white bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer shadow-md flex items-center justify-center gap-2"
                     >
-                      Close & Reveal Correct Answer
+                      {timerActive ? (
+                        <>
+                          <Zap className="w-4 h-4 fill-amber-300 text-amber-300 animate-pulse" />
+                          <span>Interrupt & Finish Question Now</span>
+                        </>
+                      ) : (
+                        <>
+                          <Square className="w-4 h-4 fill-current" />
+                          <span>Close & Reveal Correct Answer</span>
+                        </>
+                      )}
                     </button>
                   ) : (
                     <div className="grid grid-cols-2 gap-2">

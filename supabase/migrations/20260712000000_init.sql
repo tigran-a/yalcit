@@ -20,6 +20,9 @@ create policy "Users can update their own profile"
   on public.profiles for update 
   using (auth.uid() = id);
 
+-- Explicit Data API grants
+grant select, insert, update, delete on public.profiles to anon, authenticated, service_role;
+
 -- 2. SESSIONS Table
 create table public.sessions (
   id uuid default gen_random_uuid() primary key,

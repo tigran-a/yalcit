@@ -106,7 +106,7 @@ begin
   insert into public.questions (id, quiz_id, type, title, image_url, options, time_limit, sort_order)
   values (
     v_q4, v_quiz_id, 'multiple_choice',
-    'In a French boulangerie (bakery), you order ''Un ____, s''il vous plaît.'' What is the French word for ''Bread''?',
+    'In a French boulangerie (bakery), what is the French word for ''Bread''?',
     'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80',
     '[{"id":"A","text":"Le pain"},{"id":"B","text":"Le fromage"},{"id":"C","text":"Le beurre"},{"id":"D","text":"Le gâteau"}]'::jsonb,
     30, 4
