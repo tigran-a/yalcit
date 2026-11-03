@@ -200,6 +200,7 @@ export const StudentQuiz: React.FC = () => {
     if (!code) return
 
     let dbChannel: any = null
+    let presenceChannel: any = null
 
     const init = async () => {
       try {
@@ -237,6 +238,20 @@ export const StudentQuiz: React.FC = () => {
         }
 
         setLoading(false)
+
+        // Track active student presence in the quiz room so presenter knows total participants
+        const presenceChannelName = `session_lobby:${code.toUpperCase()}`
+        supabase.removeChannel(supabase.channel(presenceChannelName))
+        presenceChannel = supabase.channel(presenceChannelName)
+        presenceChannel.subscribe(async (status: string) => {
+          if (status === 'SUBSCRIBED') {
+            await presenceChannel.track({
+              user_id: user.id,
+              display_name: profile.display_name,
+              joined_at: new Date().toISOString(),
+            })
+          }
+        })
 
         // Subscribe to real-time updates on this session row
         const sessionChannelName = `student_session:${sessionData.id}`
@@ -294,6 +309,7 @@ export const StudentQuiz: React.FC = () => {
     init()
 
     return () => {
+      if (presenceChannel) supabase.removeChannel(presenceChannel)
       if (dbChannel) supabase.removeChannel(dbChannel)
     }
   }, [code, user, profile, authLoading, navigate])

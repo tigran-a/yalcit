@@ -48,6 +48,8 @@ export const PresenterQuiz: React.FC = () => {
 
   const [responses, setResponses] = useState<StudentResponse[]>([])
   const [scoreboard, setScoreboard] = useState<ScoreboardEntry[]>([])
+  const [onlineParticipantCount, setOnlineParticipantCount] = useState<number>(0)
+  const [knownParticipantIds, setKnownParticipantIds] = useState<Set<string>>(new Set())
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -147,6 +149,20 @@ export const PresenterQuiz: React.FC = () => {
 
         setResponses(currentResponses || [])
 
+        // Fetch all distinct participants who have answered so far in this session
+        const { data: allSessionResponses } = await supabase
+          .from('responses')
+          .select('user_id')
+          .eq('session_id', session.id)
+
+        if (allSessionResponses) {
+          const ids = new Set<string>()
+          allSessionResponses.forEach((r: any) => {
+            if (r.user_id) ids.add(r.user_id)
+          })
+          setKnownParticipantIds(ids)
+        }
+
       } catch (err: any) {
         console.error('Quiz init failed:', err)
         let displayError = err.message || 'Initialization failed.'
@@ -160,6 +176,27 @@ export const PresenterQuiz: React.FC = () => {
     }
 
     init()
+
+    // Subscribe to student presence channel so presenter knows live connected student count
+    const presenceChannelName = `session_lobby:${code.toUpperCase()}`
+    supabase.removeChannel(supabase.channel(presenceChannelName))
+    const presenceChannel = supabase.channel(presenceChannelName)
+      .on('presence', { event: 'sync' }, () => {
+        const state = presenceChannel.presenceState()
+        const uniqueIds = new Set<string>()
+        Object.keys(state).forEach((key) => {
+          const presences = state[key] as any[]
+          presences.forEach((p) => {
+            if (p.user_id) uniqueIds.add(p.user_id)
+          })
+        })
+        setOnlineParticipantCount(uniqueIds.size)
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(presenceChannel)
+    }
   }, [code])
 
   // 2. Real-time changes subscription for incoming student responses
@@ -192,6 +229,13 @@ export const PresenterQuiz: React.FC = () => {
         (payload) => {
           const newResponse = payload.new as any
           if (newResponse.session_id && newResponse.session_id !== sessionId) return
+          if (newResponse.user_id) {
+            setKnownParticipantIds(prev => {
+              const next = new Set(prev)
+              next.add(newResponse.user_id)
+              return next
+            })
+          }
           setResponses(prev => {
             if (prev.some(r => r.id === newResponse.id)) return prev
             return [...prev, newResponse]
@@ -474,6 +518,9 @@ export const PresenterQuiz: React.FC = () => {
       ? activeQuestion.options?.find((opt: any) => opt.id === activeQuestion.correct_option_id)
       : null
 
+  const totalParticipants = Math.max(onlineParticipantCount, knownParticipantIds.size, responses.length)
+  const allParticipantsAnswered = totalParticipants > 0 && responses.length >= totalParticipants
+
   return (
     <div className="relative flex flex-col min-h-screen p-6 bg-bg text-text-primary transition-colors duration-300">
       {/* Background Glows */}
@@ -499,9 +546,19 @@ export const PresenterQuiz: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2.5">
-          <div className="flex items-center gap-1.5 bg-white/5 dark:bg-white/5 border border-border px-3 py-1.5 rounded-full text-text-secondary text-xs font-semibold">
-            <Users className="w-4 h-4 text-brand-primary-light" />
-            <span>{responses.length} Answered</span>
+          <div className={`flex items-center gap-1.5 border px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+            allParticipantsAnswered
+              ? 'bg-brand-success/15 border-brand-success/40 text-brand-success'
+              : 'bg-white/5 dark:bg-white/5 border-border text-text-secondary'
+          }`}>
+            {allParticipantsAnswered ? (
+              <Check className="w-4 h-4 text-brand-success" />
+            ) : (
+              <Users className="w-4 h-4 text-brand-primary-light" />
+            )}
+            <span>
+              {responses.length}{totalParticipants > 0 ? ` / ${totalParticipants}` : ''} Answered
+            </span>
           </div>
           <button
             onClick={toggleFullscreen}
@@ -714,28 +771,57 @@ export const PresenterQuiz: React.FC = () => {
                 )}
 
                 {/* Controller Action buttons */}
-                <div className="space-y-2">
+                <div className="space-y-2.5">
+                  {allParticipantsAnswered && !questionRevealed && (
+                    <div className="p-2.5 rounded-xl bg-brand-success/15 border border-brand-success/30 text-brand-success text-xs font-bold text-center flex items-center justify-center gap-1.5 animate-pulse">
+                      <Check className="w-4 h-4" />
+                      <span>All {totalParticipants} participant{totalParticipants !== 1 ? 's' : ''} answered!</span>
+                    </div>
+                  )}
+
                   {!questionRevealed ? (
-                    <button
-                      onClick={() => {
-                        setTimeLeft(0)
-                        setTimerActive(false)
-                        handleCloseQuestionAndReveal()
-                      }}
-                      className="w-full py-3.5 rounded-xl font-extrabold text-sm text-white bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer shadow-md flex items-center justify-center gap-2"
-                    >
-                      {timerActive ? (
-                        <>
-                          <Zap className="w-4 h-4 fill-amber-300 text-amber-300 animate-pulse" />
-                          <span>Interrupt & Finish Question Now</span>
-                        </>
-                      ) : (
-                        <>
-                          <Square className="w-4 h-4 fill-current" />
-                          <span>Close & Reveal Correct Answer</span>
-                        </>
+                    <div className="space-y-2">
+                      {allParticipantsAnswered && (
+                        <button
+                          onClick={handleNext}
+                          className="w-full py-3.5 rounded-xl font-extrabold text-sm text-white bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer shadow-lg shadow-brand-success/20 flex items-center justify-center gap-2"
+                        >
+                          <span>{currentQuestionIndex + 1 < questions.length ? 'Jump to Next Question' : 'Finish & Show Results'}</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </button>
                       )}
-                    </button>
+
+                      <button
+                        onClick={() => {
+                          setTimeLeft(0)
+                          setTimerActive(false)
+                          handleCloseQuestionAndReveal()
+                        }}
+                        className="w-full py-3.5 rounded-xl font-extrabold text-sm text-white bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer shadow-md flex items-center justify-center gap-2"
+                      >
+                        {timerActive ? (
+                          <>
+                            <Zap className="w-4 h-4 fill-amber-300 text-amber-300 animate-pulse" />
+                            <span>{allParticipantsAnswered ? 'Reveal Correct Answer' : 'Interrupt & Finish Question Now'}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Square className="w-4 h-4 fill-current" />
+                            <span>Close & Reveal Correct Answer</span>
+                          </>
+                        )}
+                      </button>
+
+                      {!allParticipantsAnswered && (
+                        <button
+                          onClick={handleNext}
+                          className="w-full py-2.5 rounded-xl font-bold text-xs text-text-secondary hover:text-text-primary bg-white/5 border border-border hover:bg-white/10 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                        >
+                          <span>{currentQuestionIndex + 1 < questions.length ? 'Skip to Next Question' : 'Skip & End Quiz'}</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   ) : (
                     <div className="grid grid-cols-2 gap-2">
                       <button
