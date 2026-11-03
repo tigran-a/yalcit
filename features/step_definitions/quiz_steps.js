@@ -8,23 +8,25 @@ setDefaultTimeout(15000)
 
 import fs from 'fs'
 
-// Read credentials
-const credentialsContent = fs.readFileSync('../supabase.credentials', 'utf8')
+// Read credentials from environment variables (for CI/CD) or fallback to ../supabase.credentials
 const config = {}
-credentialsContent.split('\n').forEach(line => {
-  const parts = line.split(':')
-  if (parts.length >= 2) {
-    const key = parts[0].trim()
-    const value = parts.slice(1).join(':').trim().replace(/['"]/g, '')
-    if (key && value) {
-      config[key] = value
+if (fs.existsSync('../supabase.credentials')) {
+  const credentialsContent = fs.readFileSync('../supabase.credentials', 'utf8')
+  credentialsContent.split('\n').forEach(line => {
+    const parts = line.split(':')
+    if (parts.length >= 2) {
+      const key = parts[0].trim()
+      const value = parts.slice(1).join(':').trim().replace(/['"]/g, '')
+      if (key && value) {
+        config[key] = value
+      }
     }
-  }
-})
+  })
+}
 
-const supabaseUrl = config.url
-const supabaseAnonKey = config.publishable_key
-const supabaseServiceKey = config.secret_key
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || config.url
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || config.publishable_key
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || config.secret_key
 
 const adminClient = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } })
 const presenterClient = createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } })

@@ -1,75 +1,68 @@
-# React + TypeScript + Vite
+# YALCIT — Yet Another Live Classroom Interaction Tool
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**Yalcit** is a real-time classroom quiz and live interaction platform built with **React 19**, **TypeScript**, **Tailwind CSS v4**, and **Supabase** (PostgreSQL, Row-Level Security, Realtime Presence & Postgres Changes, and Storage).
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## ✨ Key Features
 
-## React Compiler
+- **Instant Student Join (No Account Required)**: Students join via a 6-character room code or QR code using Supabase Anonymous Auth, with late-joiner support and local draft answer persistence across tab switches.
+- **Live Presenter Control & Projection**:
+  - Real-time student lobby via Supabase Presence.
+  - Multiple-choice (with optional question & option images) and open-ended questions.
+  - Instant question interruption (`⚡ Interrupt & Finish Question Now`), keyboard shortcuts (`Space` / `→` to advance, `F` for fullscreen), and synthesized Web Audio sound effects with mute toggle.
+  - Animated live vote distribution charts (Recharts) and celebratory podium reveal.
+- **Speed-Based & Standard Scoring**: Presenters choose between Kahoot-style speed-bonus scoring (500–1,000 pts) or flat scoring (100 pts) when launching a session, graded securely server-side via PostgreSQL triggers.
+- **Reusable Quiz Library & Community Sharing**:
+  - Create, edit, duplicate/fork, and share public quizzes.
+  - Built-in 12-question **🇫🇷 Learn French for Beginners (Demo)** quiz with toggle control.
+  - Bulk JSON import/export for quiz templates.
+  - **Session History & CSV Gradebook Export** for teachers to download student rankings and accuracy.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## 🛠️ Local Development
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+1. **Install dependencies**:
+   ```bash
+   npm install
+   ```
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+2. **Configure environment variables**:
+   Copy `.env.example` to `.env` and fill in your Supabase project URL and publishable anon key:
+   ```env
+   VITE_SUPABASE_URL=https://your-project.supabase.co
+   VITE_SUPABASE_ANON_KEY=your-anon-publishable-key
+   ```
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+3. **Start the development server**:
+   ```bash
+   npm run dev
+   ```
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+4. **Build for production**:
+   ```bash
+   npm run build
+   ```
 
-```
+5. **Run Cucumber BDD tests**:
+   ```bash
+   npm run test
+   ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+---
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## 🚀 Automated Deployment (GitHub Pages & Vercel / Cloudflare Pages)
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+The project is pre-configured to deploy seamlessly to **both** GitHub Pages and root-domain hosts (Vercel, Cloudflare Pages, Netlify):
 
-```
+### 1. GitHub Pages (Automated via GitHub Actions)
+- Workflow: [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs automatically on every push to `main`.
+- **One-time setup in GitHub**:
+  1. Go to your repository on GitHub → **Settings** → **Pages**.
+  2. Under **Build and deployment** → **Source**, select **GitHub Actions**.
+  3. Every push to `main` automatically builds and publishes to `https://<username>.github.io/yalcit/`.
+
+### 2. Vercel / Cloudflare Pages / Netlify
+- SPA routing rules are pre-configured in [`vercel.json`](vercel.json) and [`public/_redirects`](public/_redirects).
+- Simply import the GitHub repository in Vercel or Cloudflare Pages (`Build command: npm run build`, `Output directory: dist`) and it will deploy to a root domain automatically on every push.

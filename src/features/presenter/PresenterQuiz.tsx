@@ -1,16 +1,22 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Loader2, Award, Clock, ArrowRight, Check, Users, Square, Zap } from 'lucide-react'
+import {
+  Loader2, Award, Clock, ArrowRight, Check, Users, Square, Zap,
+  Download, Maximize2, Minimize2, ArrowLeft
+} from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Cell, ResponsiveContainer } from 'recharts'
 import confetti from 'canvas-confetti'
 import { supabase } from '../../lib/supabaseClient'
 import { ThemeToggle } from '../../components/ThemeToggle'
+import { SoundToggle } from '../../components/SoundToggle'
 import { useAuth } from '../../contexts/AuthContext'
+import { playTick, playRevealChime, playVictoryFanfare } from '../../lib/soundEffects'
 
 interface StudentResponse {
   id: string
   answer: { option_id?: string; text?: string }
   is_correct: boolean
+  points?: number
   nickname: string
   user_id: string
 }
@@ -18,6 +24,8 @@ interface StudentResponse {
 interface ScoreboardEntry {
   nickname: string
   score: number
+  correctCount: number
+  totalAnswered: number
 }
 
 export const PresenterQuiz: React.FC = () => {
@@ -37,12 +45,13 @@ export const PresenterQuiz: React.FC = () => {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [questions, setQuestions] = useState<any[]>([])
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
-  
+
   const [responses, setResponses] = useState<StudentResponse[]>([])
   const [scoreboard, setScoreboard] = useState<ScoreboardEntry[]>([])
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
 
   // Question Controller States
   const [timeLeft, setTimeLeft] = useState(30)
@@ -55,14 +64,29 @@ export const PresenterQuiz: React.FC = () => {
 
   const activeQuestion = questions[currentQuestionIndex]
 
-  // 1. Initial Load of session, questions, and scoreboard state
+  // Toggle browser fullscreen for classroom projection
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {})
+    } else {
+      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {})
+    }
+  }
+
+  useEffect(() => {
+    const onFsChange = () => setIsFullscreen(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', onFsChange)
+    return () => document.removeEventListener('fullscreenchange', onFsChange)
+  }, [])
+
+  // 1. Initial Load of session, questions (including correct_option_id), and scoreboard state
   useEffect(() => {
     if (!code) return
 
     const init = async () => {
       try {
         setLoading(true)
-        
+
         // Fetch session row
         const { data: session, error: sessionErr } = await supabase
           .from('sessions')
@@ -79,10 +103,10 @@ export const PresenterQuiz: React.FC = () => {
         setSessionId(session.id)
         setQuestionRevealed(session.current_question_revealed)
 
-        // Fetch questions order
+        // Fetch questions order with correct answers joined
         const { data: questionsData, error: qErr } = await supabase
           .from('questions')
-          .select('*')
+          .select('*, question_answers(correct_option_id)')
           .eq('quiz_id', session.quiz_id)
           .order('sort_order', { ascending: true })
 
@@ -90,22 +114,34 @@ export const PresenterQuiz: React.FC = () => {
           throw new Error('No questions found in this session.')
         }
 
-        setQuestions(questionsData)
+        const mappedQuestions = questionsData.map((q: any) => {
+          const correctAns =
+            q.question_answers?.correct_option_id ||
+            (Array.isArray(q.question_answers) ? q.question_answers[0]?.correct_option_id : '') ||
+            q.correct_option_id ||
+            ''
+          return {
+            ...q,
+            correct_option_id: correctAns
+          }
+        })
+
+        setQuestions(mappedQuestions)
 
         // Find currently active index in database
-        const dbActiveIdx = questionsData.findIndex(q => q.id === session.current_question_id)
+        const dbActiveIdx = mappedQuestions.findIndex(q => q.id === session.current_question_id)
         const activeIdx = dbActiveIdx !== -1 ? dbActiveIdx : 0
         setCurrentQuestionIndex(activeIdx)
 
         // Start countdown timer
-        const currentQ = questionsData[activeIdx]
+        const currentQ = mappedQuestions[activeIdx]
         setTimeLeft(currentQ.time_limit)
-        setTimerActive(!session.current_question_revealed)
+        setTimerActive(!session.current_question_revealed && session.status !== 'ended')
 
         // Fetch current responses for this active question in THIS session
         const { data: currentResponses } = await supabase
           .from('responses')
-          .select('id, answer, is_correct, nickname, user_id')
+          .select('id, answer, is_correct, points, nickname, user_id')
           .eq('session_id', session.id)
           .eq('question_id', currentQ.id)
 
@@ -130,11 +166,10 @@ export const PresenterQuiz: React.FC = () => {
   useEffect(() => {
     if (!activeQuestion || !sessionId) return
 
-    // Fetch current responses for active question in this session
     const fetchQuestionResponses = async () => {
       const { data } = await supabase
         .from('responses')
-        .select('id, answer, is_correct, nickname, user_id')
+        .select('id, answer, is_correct, points, nickname, user_id')
         .eq('session_id', sessionId)
         .eq('question_id', activeQuestion.id)
 
@@ -143,7 +178,6 @@ export const PresenterQuiz: React.FC = () => {
 
     fetchQuestionResponses()
 
-    // Subscribe to responses INSERTs for this active question in this session
     const responseChannelName = `live_responses:${sessionId}:${activeQuestion.id}`
     supabase.removeChannel(supabase.channel(responseChannelName))
     const responseChannel = supabase.channel(responseChannelName)
@@ -159,7 +193,6 @@ export const PresenterQuiz: React.FC = () => {
           const newResponse = payload.new as any
           if (newResponse.session_id && newResponse.session_id !== sessionId) return
           setResponses(prev => {
-            // Deduplicate (safeguard)
             if (prev.some(r => r.id === newResponse.id)) return prev
             return [...prev, newResponse]
           })
@@ -178,15 +211,18 @@ export const PresenterQuiz: React.FC = () => {
     }
   }, [activeQuestion, sessionId])
 
-  // 3. Countdown timer logic
+  // 3. Countdown timer logic with sound effects in last 5 seconds
   useEffect(() => {
     if (timerActive && timeLeft > 0) {
+      if (timeLeft <= 5) {
+        playTick(timeLeft <= 2)
+      }
       timerRef.current = setTimeout(() => {
         setTimeLeft(prev => prev - 1)
       }, 1000)
     } else if (timeLeft === 0 && timerActive) {
       setTimerActive(false)
-      handleCloseQuestionAndReveal() // Auto reveal correct answers when timer finishes
+      handleCloseQuestionAndReveal()
     }
 
     return () => {
@@ -200,7 +236,6 @@ export const PresenterQuiz: React.FC = () => {
     setTimerActive(false)
 
     try {
-      // Set session column current_question_revealed = true
       const { error: revealErr } = await supabase
         .from('sessions')
         .update({ current_question_revealed: true })
@@ -208,18 +243,17 @@ export const PresenterQuiz: React.FC = () => {
 
       if (revealErr) throw revealErr
       setQuestionRevealed(true)
+      playRevealChime()
 
-      // Play sound or fire confetti if open-ended/mcq answers exist
       confetti({
         particleCount: 80,
         spread: 70,
         origin: { y: 0.7 }
       })
 
-      // Reload responses from DB to ensure grading is evaluated by DB trigger
       const { data: gradedResponses, error: reloadErr } = await supabase
         .from('responses')
-        .select('id, answer, is_correct, nickname, user_id')
+        .select('id, answer, is_correct, points, nickname, user_id')
         .eq('session_id', sessionId)
         .eq('question_id', activeQuestion.id)
 
@@ -241,7 +275,6 @@ export const PresenterQuiz: React.FC = () => {
   const getChartData = () => {
     if (!activeQuestion || activeQuestion.type !== 'multiple_choice') return []
 
-    // Map each choice options to count submissions
     return activeQuestion.options.map((opt: any) => {
       const voteCount = responses.filter(r => r.answer?.option_id === opt.id).length
       return {
@@ -256,7 +289,6 @@ export const PresenterQuiz: React.FC = () => {
   const fetchScoreboard = async () => {
     if (!sessionId) return
     try {
-      // Calculate sums of correct responses & points per student
       const { data, error: scoreErr } = await supabase
         .from('responses')
         .select('nickname, is_correct, points')
@@ -264,19 +296,24 @@ export const PresenterQuiz: React.FC = () => {
 
       if (scoreErr) throw scoreErr
 
-      const sums: Record<string, number> = {}
+      const stats: Record<string, { score: number; correctCount: number; totalAnswered: number }> = {}
       data.forEach((r: any) => {
-        if (!sums[r.nickname]) sums[r.nickname] = 0
+        if (!stats[r.nickname]) {
+          stats[r.nickname] = { score: 0, correctCount: 0, totalAnswered: 0 }
+        }
         const earned = r.points !== undefined && r.points !== null ? r.points : (r.is_correct ? 100 : 0)
-        sums[r.nickname] += earned
+        stats[r.nickname].score += earned
+        stats[r.nickname].totalAnswered += 1
+        if (r.is_correct) stats[r.nickname].correctCount += 1
       })
 
-      const board: ScoreboardEntry[] = Object.keys(sums).map(key => ({
+      const board: ScoreboardEntry[] = Object.keys(stats).map(key => ({
         nickname: key,
-        score: sums[key]
+        score: stats[key].score,
+        correctCount: stats[key].correctCount,
+        totalAnswered: stats[key].totalAnswered
       }))
 
-      // Sort descending
       board.sort((a, b) => b.score - a.score)
       setScoreboard(board)
       setShowScoreboard(true)
@@ -286,19 +323,41 @@ export const PresenterQuiz: React.FC = () => {
     }
   }
 
+  // Export CSV gradebook of session standings
+  const handleExportCSV = () => {
+    if (scoreboard.length === 0) return
+
+    const headers = ['Rank', 'Nickname', 'Total Score', 'Correct Answers', 'Total Questions', 'Accuracy (%)']
+    const totalQ = questions.length || 1
+    const rows = scoreboard.map((entry, idx) => {
+      const accuracy = Math.round((entry.correctCount / totalQ) * 100)
+      const safeName = `"${(entry.nickname || '').replace(/"/g, '""')}"`
+      return [idx + 1, safeName, entry.score, entry.correctCount, totalQ, `${accuracy}%`].join(',')
+    })
+
+    const csvContent = [headers.join(','), ...rows].join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `yalcit_session_${code?.toUpperCase() || 'results'}_${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
   // Navigate to next question or end the quiz session
   const handleNext = async () => {
     if (!sessionId) return
-    
+
     const nextIndex = currentQuestionIndex + 1
 
     if (nextIndex < questions.length) {
-      // Proceed to next question index
       const nextQuestion = questions[nextIndex]
       setLoading(true)
 
       try {
-        // Update database with new active question id and reset reveal flag & start timestamp
         const { error: nextErr } = await supabase
           .from('sessions')
           .update({
@@ -310,7 +369,6 @@ export const PresenterQuiz: React.FC = () => {
 
         if (nextErr) throw nextErr
 
-        // Update local presenter states
         setResponses([])
         setQuestionRevealed(false)
         setShowScoreboard(false)
@@ -334,14 +392,13 @@ export const PresenterQuiz: React.FC = () => {
 
         if (endErr) throw endErr
 
-        // Fire giant victory confetti
+        playVictoryFanfare()
         confetti({
           particleCount: 150,
           spread: 80,
           origin: { y: 0.5 }
         })
 
-        // Fetch final scoreboard standing
         await fetchScoreboard()
         setShowScoreboard(true)
 
@@ -357,6 +414,36 @@ export const PresenterQuiz: React.FC = () => {
       }
     }
   }
+
+  // Keyboard shortcuts for presenter convenience (Space / ArrowRight / F)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      if (loading || error) return
+
+      if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault()
+        toggleFullscreen()
+      } else if (e.key === 'ArrowRight' || e.key === ' ') {
+        e.preventDefault()
+        if (showScoreboard) {
+          if (currentQuestionIndex + 1 < questions.length) {
+            handleNext()
+          }
+        } else if (!questionRevealed) {
+          setTimeLeft(0)
+          setTimerActive(false)
+          handleCloseQuestionAndReveal()
+        } else {
+          handleNext()
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [loading, error, showScoreboard, questionRevealed, currentQuestionIndex, questions.length, sessionId, activeQuestion])
 
   if (loading) {
     return (
@@ -382,6 +469,11 @@ export const PresenterQuiz: React.FC = () => {
     )
   }
 
+  const matchedCorrectOption =
+    activeQuestion?.type === 'multiple_choice'
+      ? activeQuestion.options?.find((opt: any) => opt.id === activeQuestion.correct_option_id)
+      : null
+
   return (
     <div className="relative flex flex-col min-h-screen p-6 bg-bg text-text-primary transition-colors duration-300">
       {/* Background Glows */}
@@ -389,8 +481,15 @@ export const PresenterQuiz: React.FC = () => {
       <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-brand-secondary/10 rounded-full blur-3xl animate-pulse-slow pointer-events-none" />
 
       {/* Header */}
-      <header className="relative z-10 w-full max-w-5xl mx-auto flex items-center justify-between mb-8 pb-4 border-b border-border">
-        <div className="flex items-center gap-4">
+      <header className="relative z-10 w-full max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-3 mb-8 pb-4 border-b border-border">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate('/presenter/dashboard')}
+            className="p-2 rounded-xl bg-white/5 border border-border hover:bg-white/10 text-text-secondary hover:text-text-primary transition-all cursor-pointer"
+            title="Back to Dashboard"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </button>
           <span className="text-xs font-bold bg-white/5 dark:bg-white/5 border border-border px-3 py-1.5 rounded-full text-text-secondary select-none">
             Room Code: <span className="text-brand-accent font-mono font-bold select-all cursor-pointer">{code?.toUpperCase()}</span>
           </span>
@@ -399,14 +498,24 @@ export const PresenterQuiz: React.FC = () => {
           </span>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2.5">
           <div className="flex items-center gap-1.5 bg-white/5 dark:bg-white/5 border border-border px-3 py-1.5 rounded-full text-text-secondary text-xs font-semibold">
             <Users className="w-4 h-4 text-brand-primary-light" />
             <span>{responses.length} Answered</span>
           </div>
+          <button
+            onClick={toggleFullscreen}
+            className="p-2.5 rounded-xl bg-white/5 border border-border hover:border-brand-primary/30 text-text-secondary hover:text-text-primary transition-all duration-300 shadow-md flex items-center justify-center cursor-pointer active:scale-95"
+            title="Toggle Fullscreen (Shortcut: F)"
+            aria-label="Toggle Fullscreen"
+          >
+            {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+          </button>
+          <SoundToggle />
           <ThemeToggle />
         </div>
       </header>
+
       {/* Main Board projections */}
       <main className="relative z-10 w-full max-w-5xl mx-auto flex-grow flex flex-col justify-center">
         
@@ -507,7 +616,12 @@ export const PresenterQuiz: React.FC = () => {
                     }`}>
                       {idx + 1}
                     </span>
-                    <span className="font-bold text-text-primary text-sm">{entry.nickname}</span>
+                    <div>
+                      <span className="font-bold text-text-primary text-sm block">{entry.nickname}</span>
+                      <span className="text-[10px] text-text-secondary">
+                        {entry.correctCount} / {questions.length} correct
+                      </span>
+                    </div>
                   </div>
                   <span className="font-black text-brand-primary-light font-mono text-sm">{entry.score} pts</span>
                 </div>
@@ -520,7 +634,18 @@ export const PresenterQuiz: React.FC = () => {
               )}
             </div>
 
-            <div className="flex justify-center pt-4">
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
+              {scoreboard.length > 0 && (
+                <button
+                  onClick={handleExportCSV}
+                  className="flex items-center gap-2 px-5 py-3 font-bold rounded-xl bg-white/5 border border-border hover:bg-white/10 transition-all text-xs text-text-primary cursor-pointer"
+                  title="Download CSV Gradebook Report"
+                >
+                  <Download className="w-4 h-4 text-brand-accent" />
+                  Export Results (CSV)
+                </button>
+              )}
+
               {currentQuestionIndex + 1 < questions.length ? (
                 <button
                   onClick={handleNext}
@@ -570,9 +695,13 @@ export const PresenterQuiz: React.FC = () => {
               <div className="space-y-4">
                 {/* Timer Clock */}
                 {timerActive ? (
-                  <div className="flex items-center gap-3 bg-white/5 dark:bg-white/5 border border-border p-4 rounded-2xl justify-center">
-                    <Clock className="w-6 h-6 text-brand-accent animate-pulse" />
-                    <span className="text-3xl font-black font-mono text-text-primary">
+                  <div className={`flex items-center gap-3 border p-4 rounded-2xl justify-center transition-colors ${
+                    timeLeft <= 5
+                      ? 'bg-brand-error/15 border-brand-error/40 text-brand-error animate-pulse'
+                      : 'bg-white/5 dark:bg-white/5 border-border text-text-primary'
+                  }`}>
+                    <Clock className={`w-6 h-6 ${timeLeft <= 5 ? 'text-brand-error' : 'text-brand-accent'} animate-pulse`} />
+                    <span className="text-3xl font-black font-mono">
                       {timeLeft}s
                     </span>
                   </div>
@@ -630,7 +759,12 @@ export const PresenterQuiz: React.FC = () => {
 
             {/* Right Interactive Chart Visualizer (Col span 2) */}
             <div className="md:col-span-2 p-8 rounded-3xl glass-panel flex flex-col justify-between space-y-6">
-              <h3 className="text-sm font-bold text-text-primary">Live Response Distribution</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-text-primary">Live Response Distribution</h3>
+                <span className="text-[10px] font-semibold text-text-secondary/60 hidden sm:inline">
+                  Tip: Press Space or → to advance · F for Fullscreen
+                </span>
+              </div>
 
               {activeQuestion.type === 'multiple_choice' ? (
                 /* Chart for Multiple Choice */
@@ -653,17 +787,17 @@ export const PresenterQuiz: React.FC = () => {
                       />
                       <Bar dataKey="votes" radius={[12, 12, 0, 0]} barSize={40}>
                         {getChartData().map((entry: any, index: number) => {
-                          const optionId = entry.name.split(' ')[1] // Get option letters A, B, C, D
-                          let barColor = 'rgba(255, 255, 255, 0.15)' // default unrevealed
+                          const optionId = entry.name.split(' ')[1]
+                          let barColor = 'rgba(255, 255, 255, 0.15)'
                           
                           if (questionRevealed) {
-                            if (optionId === activeQuestion.options.find((opt: any) => opt.id === activeQuestion.correct_option_id)?.id) {
-                              barColor = 'var(--color-brand-success)' // Correct color
+                            if (optionId === activeQuestion.correct_option_id) {
+                              barColor = 'var(--color-brand-success)'
                             } else {
-                              barColor = 'var(--color-brand-error)' // Incorrect color
+                              barColor = 'var(--color-brand-error)'
                             }
                           } else {
-                            barColor = 'var(--color-brand-primary-light)' // default active unrevealed
+                            barColor = 'var(--color-brand-primary-light)'
                           }
 
                           return <Cell key={`cell-${index}`} fill={barColor} />
@@ -704,14 +838,14 @@ export const PresenterQuiz: React.FC = () => {
 
               {/* Reveal explanation footer */}
               {questionRevealed && (
-                <div className="p-4 rounded-2xl bg-white/5 dark:bg-white/5 border border-border flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2">
+                <div className="p-4 rounded-2xl bg-white/5 dark:bg-white/5 border border-border flex items-center justify-between text-xs gap-4">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <Check className="w-4 h-4 text-brand-success" />
                     <span className="font-semibold text-text-secondary">Correct Answer:</span>
                   </div>
-                  <span className="font-black text-brand-success uppercase">
+                  <span className="font-black text-brand-success truncate">
                     {activeQuestion.type === 'multiple_choice'
-                      ? `Option ${activeQuestion.correct_option_id}`
+                      ? `Option ${activeQuestion.correct_option_id}${matchedCorrectOption?.text ? ` — ${matchedCorrectOption.text}` : ''}`
                       : activeQuestion.correct_option_id}
                   </span>
                 </div>

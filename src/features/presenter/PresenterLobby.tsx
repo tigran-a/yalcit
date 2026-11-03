@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Users, Play, Sparkles, Loader2, ArrowLeft } from 'lucide-react'
+import { Users, Play, Sparkles, Loader2, ArrowLeft, Copy, Check } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
 import { ThemeToggle } from '../../components/ThemeToggle'
+import { SoundToggle } from '../../components/SoundToggle'
 import { useAuth } from '../../contexts/AuthContext'
+import { playJoinPop } from '../../lib/soundEffects'
 
 interface RosterUser {
   user_id: string
@@ -30,7 +32,23 @@ export const PresenterLobby: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [copiedLink, setCopiedLink] = useState(false)
   const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'error'>('connecting')
+
+  const prevParticipantCountRef = useRef(0)
+
+  const baseUrl = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, '')}`
+  const joinUrl = `${baseUrl}/session/${code?.toUpperCase()}`
+
+  const handleCopyJoinLink = async () => {
+    try {
+      await navigator.clipboard.writeText(joinUrl)
+      setCopiedLink(true)
+      setTimeout(() => setCopiedLink(false), 2000)
+    } catch {
+      // Fallback
+    }
+  }
 
   useEffect(() => {
     if (!code) return
@@ -40,10 +58,10 @@ export const PresenterLobby: React.FC = () => {
     const fetchSession = async () => {
       try {
         setLoading(true)
-        // 1. Fetch Session row
+        // 1. Fetch Session row with quiz title
         const { data: sessionData, error: sessionErr } = await supabase
           .from('sessions')
-          .select('*')
+          .select('*, quizzes(title)')
           .eq('code', code.toUpperCase())
           .single()
 
@@ -85,6 +103,12 @@ export const PresenterLobby: React.FC = () => {
             const list = Object.values(uniqueUsers)
             // Sort by join timestamp
             list.sort((a, b) => new Date(a.joined_at).getTime() - new Date(b.joined_at).getTime())
+
+            if (list.length > prevParticipantCountRef.current) {
+              playJoinPop()
+            }
+            prevParticipantCountRef.current = list.length
+
             setParticipants(list)
           })
           .subscribe((status: string) => {
@@ -133,7 +157,8 @@ export const PresenterLobby: React.FC = () => {
         .update({
           status: 'active',
           current_question_id: questions[0].id,
-          current_question_revealed: false
+          current_question_revealed: false,
+          current_question_started_at: new Date().toISOString()
         })
         .eq('id', session.id)
 
@@ -173,6 +198,8 @@ export const PresenterLobby: React.FC = () => {
     )
   }
 
+  const quizTitle = session?.quizzes?.title || session?.settings?.title || 'Live Quiz Session'
+
   return (
     <div className="relative flex flex-col min-h-screen p-6 bg-bg text-text-primary transition-colors duration-300">
       {/* Background Glows */}
@@ -189,47 +216,63 @@ export const PresenterLobby: React.FC = () => {
           Dashboard
         </button>
         <div className="flex items-center gap-3">
+          <SoundToggle />
           <ThemeToggle />
         </div>
       </header>
 
       {/* Main Board projection */}
-      <main className="relative z-10 w-full max-w-5xl mx-auto flex-grow flex flex-col items-center justify-center text-center space-y-12">
+      <main className="relative z-10 w-full max-w-5xl mx-auto flex-grow flex flex-col items-center justify-center text-center space-y-10">
         
         {/* Title & Join Info Card */}
         <div className="space-y-4 max-w-2xl">
           <span className="text-xs font-bold uppercase tracking-wider text-brand-primary-light bg-brand-primary/10 border border-brand-primary/20 px-3 py-1 rounded-full">
             Join the Live Interaction
           </span>
-          <h1 className="text-5xl font-black text-text-primary leading-tight select-all">
-            {session.settings?.title || 'Untitled Session'}
+          <h1 className="text-4xl sm:text-5xl font-black text-text-primary leading-tight select-all">
+            {quizTitle}
           </h1>
-          <div className="flex items-center justify-center gap-2 pt-2 text-sm text-text-secondary">
-            <span>Open:</span>
-            <span className="font-semibold text-text-primary">yalcit.app</span>
-            <span>or click local server & enter:</span>
+          <div className="flex flex-wrap items-center justify-center gap-2 pt-1 text-sm text-text-secondary">
+            <span>Go to</span>
+            <span className="font-bold text-text-primary">{baseUrl}</span>
+            <span>and enter the Room Code below:</span>
           </div>
         </div>
 
-        {/* Giants Code & QR Projection Card */}
-        <div className="p-8 px-12 rounded-3xl glass-panel animate-glow flex flex-col md:flex-row items-center justify-between gap-8 select-none max-w-2xl w-full">
-          <div className="flex flex-col items-center md:items-start space-y-2">
+        {/* Giant Code & QR Projection Card */}
+        <div className="p-8 px-10 rounded-3xl glass-panel animate-glow flex flex-col md:flex-row items-center justify-between gap-8 select-none max-w-2xl w-full">
+          <div className="flex flex-col items-center md:items-start space-y-3">
             <span className="text-[10px] font-bold text-text-secondary uppercase tracking-widest select-none">
               Room Code
             </span>
             <span className="text-6xl sm:text-7xl font-black tracking-widest text-text-primary select-all cursor-pointer">
               {code?.toUpperCase()}
             </span>
-            <span className="text-xs font-semibold text-brand-primary-light flex items-center gap-1 pt-1">
-              yalcit.app / session/{code?.toUpperCase()}
-            </span>
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={handleCopyJoinLink}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-primary/15 hover:bg-brand-primary/25 border border-brand-primary/30 text-xs font-bold text-brand-primary-light transition-all cursor-pointer active:scale-95"
+                title="Copy direct join link for students"
+              >
+                {copiedLink ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-brand-success" />
+                    <span className="text-brand-success">Join Link Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Copy Direct Join Link</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
           <div className="flex flex-col items-center space-y-1.5 p-3 rounded-2xl bg-white shadow-lg border border-border/80 text-center">
             <img 
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&color=4f46e5&bgcolor=ffffff&data=${encodeURIComponent(
-                `${window.location.origin}/session/${code?.toUpperCase()}`
-              )}`}
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&color=4f46e5&bgcolor=ffffff&data=${encodeURIComponent(joinUrl)}`}
               alt="Scan to Join"
               className="w-32 h-32 rounded-lg"
             />
@@ -268,7 +311,7 @@ export const PresenterLobby: React.FC = () => {
         </div>
 
         {/* Start Game controls */}
-        <div className="pt-6">
+        <div className="pt-4">
           <button
             onClick={handleStartQuiz}
             disabled={starting || participants.length === 0}

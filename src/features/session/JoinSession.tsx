@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import { Sparkles, ArrowRight, AlertCircle, Loader2 } from 'lucide-react'
+import { Sparkles, ArrowRight, AlertCircle, Loader2, Presentation } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../contexts/AuthContext'
 import { ThemeToggle } from '../../components/ThemeToggle'
@@ -22,8 +22,16 @@ export const JoinSession: React.FC = () => {
       setCode(location.state.code.toUpperCase())
     }
   }, [urlCode, location.state])
-  
-  const { signInAnonymously } = useAuth()
+
+  const { user, profile, signInAnonymously } = useAuth()
+
+  const handlePresenterPortal = () => {
+    if (user && profile?.role === 'presenter') {
+      navigate('/presenter/dashboard')
+    } else {
+      navigate('/presenter/auth')
+    }
+  }
 
   const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -85,8 +93,15 @@ export const JoinSession: React.FC = () => {
 
   return (
     <div className="relative flex flex-col items-center justify-center min-h-screen p-6 bg-bg text-text-primary selection:bg-brand-primary selection:text-white transition-colors duration-300">
-      {/* Floating Theme Toggle */}
-      <div className="absolute top-6 right-6 z-20">
+      {/* Top Navigation Controls */}
+      <div className="absolute top-6 right-6 z-20 flex items-center gap-3">
+        <button
+          onClick={handlePresenterPortal}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 border border-border hover:border-brand-primary/40 hover:bg-white/10 text-xs font-bold text-text-primary transition-all duration-300 shadow-md cursor-pointer active:scale-95"
+        >
+          <Presentation className="w-4 h-4 text-brand-primary-light" />
+          <span>{user && profile?.role === 'presenter' ? 'Presenter Dashboard' : 'Host a Quiz'}</span>
+        </button>
         <ThemeToggle />
       </div>
 
@@ -96,10 +111,13 @@ export const JoinSession: React.FC = () => {
 
       <div className="relative z-10 w-full max-w-md p-8 rounded-3xl glass-panel animate-glow">
         <div className="flex flex-col items-center mb-8">
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-2 mb-1.5">
             <Sparkles className="w-8 h-8 text-brand-accent animate-bounce" />
             <span className="text-3xl font-extrabold tracking-wider text-gradient">YALCIT</span>
           </div>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-brand-primary-light mb-3 text-center">
+            Yet Another Live Classroom Interaction Tool
+          </span>
           <p className="text-sm text-text-secondary text-center">
             Enter a session code and choose a nickname to join the live interaction!
           </p>
@@ -165,6 +183,16 @@ export const JoinSession: React.FC = () => {
             )}
           </button>
         </form>
+
+        <div className="mt-6 pt-5 border-t border-border/60 text-center">
+          <button
+            type="button"
+            onClick={handlePresenterPortal}
+            className="text-xs font-semibold text-text-secondary hover:text-brand-primary-light transition-colors cursor-pointer"
+          >
+            Are you a teacher? <span className="font-bold text-brand-primary-light underline underline-offset-4">Open Presenter Portal →</span>
+          </button>
+        </div>
       </div>
     </div>
   )

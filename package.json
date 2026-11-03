@@ -1,11 +1,12 @@
 {
-  "name": "github",
+  "name": "yalcit",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "Yalcit — Yet Another Live Classroom Interaction Tool",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && cp dist/index.html dist/404.html",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "cucumber-js --import 'features/step_definitions/**/*.js' 'features/**/*.feature'"

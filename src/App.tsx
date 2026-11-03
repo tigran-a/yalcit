@@ -10,6 +10,7 @@ const PresenterAuth = lazy(() => import('./features/presenter/PresenterAuth').th
 const PresenterDashboard = lazy(() => import('./features/presenter/PresenterDashboard').then(m => ({ default: m.PresenterDashboard })))
 const PresenterLobby = lazy(() => import('./features/presenter/PresenterLobby').then(m => ({ default: m.PresenterLobby })))
 const PresenterQuiz = lazy(() => import('./features/presenter/PresenterQuiz').then(m => ({ default: m.PresenterQuiz })))
+const NotFound = lazy(() => import('./components/NotFound').then(m => ({ default: m.NotFound })))
 
 // Common loading spinner
 const LoadingFallback = () => (
@@ -23,7 +24,7 @@ const LoadingFallback = () => (
 
 function App() {
   return (
-    <Router>
+    <Router basename={import.meta.env.BASE_URL}>
       <AuthProvider>
         <Suspense fallback={<LoadingFallback />}>
           <Routes>
@@ -38,6 +39,9 @@ function App() {
             <Route path="/presenter/dashboard" element={<PresenterDashboard />} />
             <Route path="/presenter/session/:code/lobby" element={<PresenterLobby />} />
             <Route path="/presenter/session/:code/quiz" element={<PresenterQuiz />} />
+
+            {/* Catch-all 404 Route */}
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
       </AuthProvider>

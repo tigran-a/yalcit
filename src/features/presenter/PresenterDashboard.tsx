@@ -1,12 +1,17 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { 
-  Plus, Play, LogOut, Loader2, Trash2, Award, Clock, FileText, 
-  CheckCircle2, Edit2, Copy, Eye, EyeOff, Upload, Download, ExternalLink, RefreshCw, Sparkles
+import {
+  Plus, Play, LogOut, Loader2, Trash2, Award, FileText,
+  CheckCircle2, Edit2, Copy, Eye, EyeOff, Upload, Download,
+  ExternalLink, RefreshCw, BarChart3, Home
 } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../contexts/AuthContext'
 import { ThemeToggle } from '../../components/ThemeToggle'
+import { SoundToggle } from '../../components/SoundToggle'
+import { HostSessionModal } from './components/HostSessionModal'
+import { SessionHistoryModal } from './components/SessionHistoryModal'
+import { QuizCreatorForm, type QuestionFormItem } from './components/QuizCreatorForm'
 
 interface Quiz {
   id: string
@@ -17,16 +22,6 @@ interface Quiz {
   forked_from_id?: string | null
   presenter_id?: string
   profiles?: { display_name: string } | null
-}
-
-interface Question {
-  id?: string
-  type: 'multiple_choice' | 'open_ended'
-  title: string
-  image_url?: string
-  options: { id: string; text: string; image_url?: string }[]
-  time_limit: number
-  correct_option_id?: string
 }
 
 export const PresenterDashboard: React.FC = () => {
@@ -55,7 +50,7 @@ export const PresenterDashboard: React.FC = () => {
   const [editingQuizId, setEditingQuizId] = useState<string | null>(null)
   const [quizTitle, setQuizTitle] = useState('')
   const [quizIsPublic, setQuizIsPublic] = useState(false)
-  const [questions, setQuestions] = useState<Question[]>([
+  const [questions, setQuestions] = useState<QuestionFormItem[]>([
     {
       type: 'multiple_choice',
       title: 'What is 2 + 2?',
@@ -71,9 +66,12 @@ export const PresenterDashboard: React.FC = () => {
     }
   ])
 
-  // Filter/tab states
+  // Filter/tab & modal states
   const [quizTab, setQuizTab] = useState<'mine' | 'public'>('mine')
   const [selectedQuizIds, setSelectedQuizIds] = useState<Record<string, boolean>>({})
+  const [hostModalQuiz, setHostModalQuiz] = useState<Quiz | null>(null)
+  const [speedScoringOption, setSpeedScoringOption] = useState<boolean>(true)
+  const [historyModalQuiz, setHistoryModalQuiz] = useState<Quiz | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -82,7 +80,7 @@ export const PresenterDashboard: React.FC = () => {
     if (!user) return
     try {
       setLoading(true)
-      
+
       // 1. Fetch own quizzes
       const { data: ownData, error: ownErr } = await supabase
         .from('quizzes')
@@ -143,47 +141,6 @@ export const PresenterDashboard: React.FC = () => {
     }
   }
 
-  // Handles adding empty question fields
-  const addQuestion = () => {
-    setQuestions([
-      ...questions,
-      {
-        type: 'multiple_choice',
-        title: '',
-        image_url: '',
-        options: [
-          { id: 'A', text: '' },
-          { id: 'B', text: '' },
-          { id: 'C', text: '' },
-          { id: 'D', text: '' }
-        ],
-        time_limit: 30,
-        correct_option_id: 'A'
-      }
-    ])
-  }
-
-  // Handles deleting a question index
-  const removeQuestion = (index: number) => {
-    setQuestions(questions.filter((_, idx) => idx !== index))
-  }
-
-  // Update question inputs dynamically
-  const updateQuestionData = (index: number, key: keyof Question, value: any) => {
-    const updated = [...questions]
-    updated[index] = { ...updated[index], [key]: value }
-    setQuestions(updated)
-  }
-
-  // Update question mcq option inputs
-  const updateOptionText = (qIdx: number, oIdx: number, text: string) => {
-    const updated = [...questions]
-    const updatedOptions = [...updated[qIdx].options]
-    updatedOptions[oIdx] = { ...updatedOptions[oIdx], text }
-    updated[qIdx].options = updatedOptions
-    setQuestions(updated)
-  }
-
   // Submit and create/update quiz template with questions & secure answers
   const handleCreateQuiz = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -220,8 +177,9 @@ export const PresenterDashboard: React.FC = () => {
     setError(null)
 
     try {
+      let targetQuizId = editingQuizId
+
       if (editingQuizId) {
-        // 1. Update existing Quiz template row
         const { error: quizErr } = await supabase
           .from('quizzes')
           .update({
@@ -232,46 +190,13 @@ export const PresenterDashboard: React.FC = () => {
 
         if (quizErr) throw quizErr
 
-        // 2. Clear old questions (cascades to answers)
         const { error: clearErr } = await supabase
           .from('questions')
           .delete()
           .eq('quiz_id', editingQuizId)
 
         if (clearErr) throw clearErr
-
-        // 3. Insert new questions
-        for (let idx = 0; idx < questions.length; idx++) {
-          const q = questions[idx]
-
-          const { data: insertedQuestion, error: qErr } = await supabase
-            .from('questions')
-            .insert({
-              quiz_id: editingQuizId,
-              type: q.type,
-              title: q.title.trim(),
-              image_url: q.image_url?.trim() || null,
-              options: q.type === 'multiple_choice' ? q.options : [],
-              time_limit: q.time_limit,
-              sort_order: idx + 1
-            })
-            .select()
-            .single()
-
-          if (qErr) throw qErr
-
-          const { error: answerErr } = await supabase
-            .from('question_answers')
-            .insert({
-              question_id: insertedQuestion.id,
-              correct_option_id: q.type === 'multiple_choice' ? q.correct_option_id : q.correct_option_id?.trim()
-            })
-
-          if (answerErr) throw answerErr
-        }
-
       } else {
-        // 1. Insert new Quiz template row
         const { data: quizData, error: quizErr } = await supabase
           .from('quizzes')
           .insert({
@@ -283,41 +208,38 @@ export const PresenterDashboard: React.FC = () => {
           .single()
 
         if (quizErr) throw quizErr
-
-        // 2. Insert questions and their secure answers
-        for (let idx = 0; idx < questions.length; idx++) {
-          const q = questions[idx]
-
-          // Insert question
-          const { data: insertedQuestion, error: qErr } = await supabase
-            .from('questions')
-            .insert({
-              quiz_id: quizData.id,
-              type: q.type,
-              title: q.title.trim(),
-              image_url: q.image_url?.trim() || null,
-              options: q.type === 'multiple_choice' ? q.options : [],
-              time_limit: q.time_limit,
-              sort_order: idx + 1
-            })
-            .select()
-            .single()
-
-          if (qErr) throw qErr
-
-          // Insert secure answer row
-          const { error: answerErr } = await supabase
-            .from('question_answers')
-            .insert({
-              question_id: insertedQuestion.id,
-              correct_option_id: q.type === 'multiple_choice' ? q.correct_option_id : q.correct_option_id?.trim()
-            })
-
-          if (answerErr) throw answerErr
-        }
+        targetQuizId = quizData.id
       }
 
-      // Reset Form State
+      for (let idx = 0; idx < questions.length; idx++) {
+        const q = questions[idx]
+
+        const { data: insertedQuestion, error: qErr } = await supabase
+          .from('questions')
+          .insert({
+            quiz_id: targetQuizId,
+            type: q.type,
+            title: q.title.trim(),
+            image_url: q.image_url?.trim() || null,
+            options: q.type === 'multiple_choice' ? q.options : [],
+            time_limit: q.time_limit,
+            sort_order: idx + 1
+          })
+          .select()
+          .single()
+
+        if (qErr) throw qErr
+
+        const { error: answerErr } = await supabase
+          .from('question_answers')
+          .insert({
+            question_id: insertedQuestion.id,
+            correct_option_id: q.type === 'multiple_choice' ? q.correct_option_id : q.correct_option_id?.trim()
+          })
+
+        if (answerErr) throw answerErr
+      }
+
       resetForm()
       fetchData()
 
@@ -360,14 +282,13 @@ export const PresenterDashboard: React.FC = () => {
     try {
       const fileExt = file.name.split('.').pop()
       const fileName = `${user?.id || 'anonymous'}/${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`
-      
+
       const { error: uploadErr } = await supabase.storage
         .from('yalcit-media')
         .upload(fileName, file, { cacheControl: '3600', upsert: true })
 
       if (uploadErr) throw uploadErr
 
-      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('yalcit-media')
         .getPublicUrl(fileName)
@@ -381,17 +302,23 @@ export const PresenterDashboard: React.FC = () => {
 
   const handleQuestionImageUpload = async (qIdx: number, file: File) => {
     await handleUploadImage(file, (url) => {
-      updateQuestionData(qIdx, 'image_url', url)
+      setQuestions(prev => {
+        const updated = [...prev]
+        updated[qIdx] = { ...updated[qIdx], image_url: url }
+        return updated
+      })
     })
   }
 
   const handleOptionImageUpload = async (qIdx: number, oIdx: number, file: File) => {
     await handleUploadImage(file, (url) => {
-      const updated = [...questions]
-      const updatedOptions = [...updated[qIdx].options]
-      updatedOptions[oIdx] = { ...updatedOptions[oIdx], image_url: url }
-      updated[qIdx].options = updatedOptions
-      setQuestions(updated)
+      setQuestions(prev => {
+        const updated = [...prev]
+        const updatedOptions = [...updated[qIdx].options]
+        updatedOptions[oIdx] = { ...updatedOptions[oIdx], image_url: url }
+        updated[qIdx].options = updatedOptions
+        return updated
+      })
     })
   }
 
@@ -404,7 +331,6 @@ export const PresenterDashboard: React.FC = () => {
       setQuizTitle(quiz.title)
       setQuizIsPublic(quiz.is_public)
 
-      // Fetch questions and answers for this quiz
       const { data: questionsData, error: qErr } = await supabase
         .from('questions')
         .select('*, question_answers(correct_option_id)')
@@ -413,8 +339,8 @@ export const PresenterDashboard: React.FC = () => {
 
       if (qErr) throw qErr
 
-      const mappedQuestions: Question[] = (questionsData || []).map((q: any) => {
-        const correctAns = q.question_answers?.correct_option_id || 
+      const mappedQuestions: QuestionFormItem[] = (questionsData || []).map((q: any) => {
+        const correctAns = q.question_answers?.correct_option_id ||
           (Array.isArray(q.question_answers) ? q.question_answers[0]?.correct_option_id : '')
 
         return {
@@ -438,13 +364,12 @@ export const PresenterDashboard: React.FC = () => {
     }
   }
 
-  // Clones a quiz (itself or a public quiz) into the user's library
+  // Clones a quiz into the user's library
   const handleDuplicateQuiz = async (quiz: Quiz) => {
     try {
       setLoading(true)
       setError(null)
 
-      // 1. Fetch source quiz questions and answers
       const { data: questionsData, error: qErr } = await supabase
         .from('questions')
         .select('*, question_answers(correct_option_id)')
@@ -453,7 +378,6 @@ export const PresenterDashboard: React.FC = () => {
 
       if (qErr) throw qErr
 
-      // 2. Create duplicated Quiz template row owned by current user
       const { data: newQuiz, error: quizErr } = await supabase
         .from('quizzes')
         .insert({
@@ -467,7 +391,6 @@ export const PresenterDashboard: React.FC = () => {
 
       if (quizErr) throw quizErr
 
-      // 3. Clone all questions and correct answers
       for (let idx = 0; idx < (questionsData || []).length; idx++) {
         const q = questionsData[idx]
         const { data: insertedQuestion, error: insertQErr } = await supabase
@@ -486,7 +409,7 @@ export const PresenterDashboard: React.FC = () => {
 
         if (insertQErr) throw insertQErr
 
-        const correctAns = q.question_answers?.correct_option_id || 
+        const correctAns = q.question_answers?.correct_option_id ||
           (Array.isArray(q.question_answers) ? q.question_answers[0]?.correct_option_id : '')
 
         const { error: insertAnsErr } = await supabase
@@ -517,7 +440,6 @@ export const PresenterDashboard: React.FC = () => {
     try {
       setLoading(true)
 
-      // 1. Gather all questions for this quiz to extract image URLs
       const { data: questionsData, error: qErr } = await supabase
         .from('questions')
         .select('image_url, options')
@@ -528,28 +450,21 @@ export const PresenterDashboard: React.FC = () => {
       const imagesToDelete: string[] = []
       if (questionsData) {
         questionsData.forEach((q: any) => {
-          if (q.image_url) {
-            imagesToDelete.push(q.image_url)
-          }
+          if (q.image_url) imagesToDelete.push(q.image_url)
           if (Array.isArray(q.options)) {
             q.options.forEach((opt: any) => {
-              if (opt.image_url) {
-                imagesToDelete.push(opt.image_url)
-              }
+              if (opt.image_url) imagesToDelete.push(opt.image_url)
             })
           }
         })
       }
 
-      // 2. Delete the quiz from database (cascades to questions & sessions)
       const { error: delErr } = await supabase.from('quizzes').delete().eq('id', id)
       if (delErr) throw delErr
 
-      // 3. For each image, check if it's used elsewhere, and delete if orphan
       for (const imgUrl of imagesToDelete) {
         if (!imgUrl.includes('/storage/v1/object/public/yalcit-media/')) continue
 
-        // Check if still used in other questions (active question image)
         const { data: qUsage } = await supabase
           .from('questions')
           .select('id')
@@ -558,7 +473,6 @@ export const PresenterDashboard: React.FC = () => {
 
         if (qUsage && qUsage.length > 0) continue
 
-        // Check if still used in options (MCQ option images)
         const { data: optUsage } = await supabase
           .from('questions')
           .select('id')
@@ -567,16 +481,10 @@ export const PresenterDashboard: React.FC = () => {
 
         if (optUsage && optUsage.length > 0) continue
 
-        // Extract filename from URL path and delete from storage
         const pathParts = imgUrl.split('/yalcit-media/')
         if (pathParts.length > 1) {
           const filePath = pathParts[1]
-          const { error: storageDelErr } = await supabase.storage
-            .from('yalcit-media')
-            .remove([filePath])
-          if (storageDelErr) {
-            console.error('Failed to delete storage file:', filePath, storageDelErr)
-          }
+          await supabase.storage.from('yalcit-media').remove([filePath])
         }
       }
 
@@ -590,11 +498,6 @@ export const PresenterDashboard: React.FC = () => {
     }
   }
 
-  // Hosting modal states
-  const [hostModalQuiz, setHostModalQuiz] = useState<any | null>(null)
-  const [speedScoringOption, setSpeedScoringOption] = useState<boolean>(true)
-
-  // Opens host modal for session configuration
   const handleHostQuiz = (quizId: string) => {
     const targetQuiz = [...quizzes, ...publicQuizzes].find(q => q.id === quizId)
     if (targetQuiz) {
@@ -603,16 +506,12 @@ export const PresenterDashboard: React.FC = () => {
     }
   }
 
-  // Spawns a new active session for a quiz
   const executeHostQuiz = async (quizId: string, speedScoring: boolean) => {
     if (!user) return
     try {
       setLoading(true)
-      
-      // 1. Generate unique 6-character room code (uppercase)
       const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase()
-      
-      // 2. Insert Session row pointing to this quiz template
+
       const { error: sessionErr } = await supabase
         .from('sessions')
         .insert({
@@ -627,7 +526,6 @@ export const PresenterDashboard: React.FC = () => {
       if (sessionErr) throw sessionErr
 
       setHostModalQuiz(null)
-      // 3. Navigate to lobby
       navigate(`/presenter/session/${roomCode}/lobby`)
 
     } catch (err: any) {
@@ -642,7 +540,6 @@ export const PresenterDashboard: React.FC = () => {
     }
   }
 
-  // Terminate a live ongoing session
   const handleTerminateSession = async (sessionId: string) => {
     if (!window.confirm('Are you sure you want to terminate this live session? All active students will be disconnected.')) return
     try {
@@ -659,7 +556,6 @@ export const PresenterDashboard: React.FC = () => {
     }
   }
 
-  // Toggle quiz privacy settings
   const handleTogglePrivacy = async (quiz: Quiz) => {
     try {
       const newPublicStatus = !quiz.is_public
@@ -676,7 +572,6 @@ export const PresenterDashboard: React.FC = () => {
     }
   }
 
-  // Multi-select helpers
   const handleToggleSelectQuiz = (id: string) => {
     setSelectedQuizIds(prev => ({
       ...prev,
@@ -725,7 +620,7 @@ export const PresenterDashboard: React.FC = () => {
         if (qErr) throw qErr
 
         const mappedQuestions = (questionsData || []).map((q: any) => {
-          const correctAns = q.question_answers?.correct_option_id || 
+          const correctAns = q.question_answers?.correct_option_id ||
             (Array.isArray(q.question_answers) ? q.question_answers[0]?.correct_option_id : '')
 
           return {
@@ -773,12 +668,12 @@ export const PresenterDashboard: React.FC = () => {
     try {
       setLoading(true)
       const reader = new FileReader()
-      
+
       reader.onload = async (event) => {
         try {
           const content = event.target?.result as string
           const parsed = JSON.parse(content)
-          
+
           if (!Array.isArray(parsed)) {
             throw new Error('Invalid format: File content must be an array of quizzes.')
           }
@@ -790,7 +685,6 @@ export const PresenterDashboard: React.FC = () => {
               continue
             }
 
-            // 1. Insert Quiz template
             const { data: newQuiz, error: qzErr } = await supabase
               .from('quizzes')
               .insert({
@@ -803,7 +697,6 @@ export const PresenterDashboard: React.FC = () => {
 
             if (qzErr) throw qzErr
 
-            // 2. Insert questions + answers
             for (let idx = 0; idx < item.questions.length; idx++) {
               const q = item.questions[idx]
               const { data: insertedQuestion, error: qErr } = await supabase
@@ -870,21 +763,35 @@ export const PresenterDashboard: React.FC = () => {
       <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-brand-secondary/10 rounded-full blur-3xl animate-pulse-slow pointer-events-none" />
 
       {/* Header */}
-      <header className="relative z-10 w-full max-w-6xl mx-auto flex items-center justify-between mb-10 pb-4 border-b border-border">
+      <header className="relative z-10 w-full max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-4 mb-10 pb-4 border-b border-border">
         <div className="flex flex-col">
-          <span className="text-xl font-extrabold tracking-wider text-gradient">YALCIT</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xl font-extrabold tracking-wider text-gradient">YALCIT</span>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand-primary/15 text-brand-primary-light hidden sm:inline">
+              Yet Another Live Classroom Interaction Tool
+            </span>
+          </div>
           <span className="text-[10px] text-text-secondary uppercase tracking-widest mt-0.5">
             Presenter: {profile?.display_name || 'Administrator'}
           </span>
         </div>
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={fetchData} 
-            className="p-2 rounded-xl bg-white/5 border border-border hover:bg-white/10 text-text-primary transition-all cursor-pointer"
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => navigate('/')}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 border border-border hover:bg-white/10 text-xs font-semibold text-text-secondary hover:text-text-primary transition-all cursor-pointer"
+            title="Student Join Screen"
+          >
+            <Home className="w-4 h-4" />
+            <span className="hidden sm:inline">Join Screen</span>
+          </button>
+          <button
+            onClick={fetchData}
+            className="p-2.5 rounded-xl bg-white/5 border border-border hover:bg-white/10 text-text-primary transition-all cursor-pointer"
             title="Refresh Dashboard"
           >
             <RefreshCw className="w-4 h-4" />
           </button>
+          <SoundToggle />
           <ThemeToggle />
           <button
             onClick={handleLogOut}
@@ -1100,6 +1007,13 @@ export const PresenterDashboard: React.FC = () => {
                       <Play className="w-3.5 h-3.5" />
                     </button>
                     <button
+                      onClick={() => setHistoryModalQuiz(quiz)}
+                      className="p-1.5 rounded hover:bg-brand-accent/15 text-brand-accent transition-all cursor-pointer"
+                      title="Session History & CSV Gradebook"
+                    >
+                      <BarChart3 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
                       onClick={() => handleEditQuiz(quiz)}
                       className="p-1.5 rounded hover:bg-brand-primary/15 text-brand-primary transition-all cursor-pointer"
                       title="Edit Quiz"
@@ -1109,7 +1023,7 @@ export const PresenterDashboard: React.FC = () => {
                     <button
                       onClick={() => handleTogglePrivacy(quiz)}
                       className="p-1.5 rounded hover:bg-white/10 text-text-primary transition-all cursor-pointer"
-                      title={quiz.is_public ? "Make Private" : "Make Public"}
+                      title={quiz.is_public ? 'Make Private' : 'Make Public'}
                     >
                       {quiz.is_public ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     </button>
@@ -1179,7 +1093,7 @@ export const PresenterDashboard: React.FC = () => {
               {quizTab === 'mine' && quizzes.length === 0 && !loading && (
                 <div className="text-center p-8 rounded-2xl border border-dashed border-border text-text-secondary">
                   <FileText className="w-8 h-8 text-border mx-auto mb-2" />
-                  <p className="text-xs">No quizzes templates created yet. Click the + button!</p>
+                  <p className="text-xs">No quiz templates created yet. Click the + button!</p>
                 </div>
               )}
 
@@ -1209,306 +1123,27 @@ export const PresenterDashboard: React.FC = () => {
           )}
 
           {showCreator ? (
-            /* Quiz Creator / Editor Form */
-            <form onSubmit={handleCreateQuiz} className="p-8 rounded-3xl glass-panel animate-glow space-y-8">
-              <div className="flex items-center justify-between border-b border-border pb-4">
-                <h2 className="text-lg font-black text-text-primary">
-                  {editingQuizId ? 'Edit Quiz Template' : 'Create New Quiz Template'}
-                </h2>
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="text-xs font-semibold text-text-secondary hover:text-text-primary transition-all cursor-pointer"
-                >
-                  Cancel
-                </button>
-              </div>
-
-              {/* Title input */}
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-text-secondary mb-2">
-                  Quiz Title
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Weekly Math Trivia"
-                  value={quizTitle}
-                  onChange={(e) => setQuizTitle(e.target.value)}
-                  className="w-full px-5 py-4 rounded-2xl bg-white/5 dark:bg-white/5 border border-border focus:border-brand-primary/50 text-text-primary placeholder:text-text-secondary/40 focus:outline-none transition-all duration-300 font-bold"
-                  required
-                />
-              </div>
-
-              {/* Privacy checkbox */}
-              <div className="flex items-center gap-3 bg-white/5 border border-border p-4 rounded-2xl">
-                <input
-                  type="checkbox"
-                  id="quizIsPublic"
-                  checked={quizIsPublic}
-                  onChange={(e) => setQuizIsPublic(e.target.checked)}
-                  className="w-4 h-4 rounded border-border text-brand-primary focus:ring-brand-primary cursor-pointer"
-                />
-                <div className="select-none cursor-pointer flex flex-col">
-                  <label htmlFor="quizIsPublic" className="text-xs font-bold text-text-primary cursor-pointer">
-                    Share Quiz Publicly
-                  </label>
-                  <span className="text-[10px] text-text-secondary">
-                    Allow all presenters to duplicate and play this quiz in their own active classrooms.
-                  </span>
-                </div>
-              </div>
-
-              {/* Questions list */}
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-text-primary">Quiz Questions</h3>
-                  <button
-                    type="button"
-                    onClick={addQuestion}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-border hover:bg-white/10 text-xs font-semibold transition-all cursor-pointer text-text-primary"
-                  >
-                    <Plus className="w-3.5 h-3.5 text-brand-accent" />
-                    Add Question
-                  </button>
-                </div>
-
-                {questions.map((q, qIdx) => (
-                  <div key={qIdx} className="p-6 rounded-2xl bg-white/5 dark:bg-white/5 border border-border space-y-5 relative">
-                    <button
-                      type="button"
-                      onClick={() => removeQuestion(qIdx)}
-                      className="absolute top-4 right-4 p-1.5 text-text-secondary hover:text-brand-error transition-all cursor-pointer"
-                      title="Remove Question"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-
-                    {/* Question Header & Type */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div className="sm:col-span-2">
-                        <label className="block text-[10px] font-bold uppercase tracking-wider text-text-secondary mb-2">
-                          Question #{qIdx + 1} Text
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Type your question prompt..."
-                          value={q.title}
-                          onChange={(e) => updateQuestionData(qIdx, 'title', e.target.value)}
-                          className="w-full px-4 py-2.5 rounded-xl bg-white/5 dark:bg-white/5 border border-border focus:border-brand-primary/50 text-text-primary placeholder:text-text-secondary/40 focus:outline-none transition-all text-sm font-semibold"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-wider text-text-secondary mb-2">
-                          Type
-                        </label>
-                        <select
-                          value={q.type}
-                          onChange={(e) => updateQuestionData(qIdx, 'type', e.target.value as any)}
-                          className="w-full px-3 py-2.5 rounded-xl bg-white/5 dark:bg-white/5 border border-border text-text-primary text-sm focus:outline-none focus:border-brand-primary/50 transition-all font-semibold"
-                        >
-                          <option className="bg-bg text-text-primary" value="multiple_choice">Multiple Choice</option>
-                          <option className="bg-bg text-text-primary" value="open_ended">Open Ended</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Question Image URL & Upload */}
-                    <div className="space-y-2">
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-text-secondary">
-                        Question Image (Optional)
-                      </label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="url"
-                          placeholder="e.g. https://images.unsplash.com/photo-12345..."
-                          value={q.image_url || ''}
-                          onChange={(e) => updateQuestionData(qIdx, 'image_url', e.target.value)}
-                          className="flex-grow px-4 py-2.5 rounded-xl bg-white/5 dark:bg-white/5 border border-border focus:border-brand-primary/50 text-text-primary placeholder:text-text-secondary/40 focus:outline-none transition-all text-xs font-semibold"
-                        />
-                        <label className="flex-shrink-0 cursor-pointer px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 border border-border text-xs font-bold text-text-primary flex items-center gap-1.5 transition-all">
-                          <Upload className="w-4 h-4 text-brand-accent" />
-                          <span>Upload File</span>
-                          <input 
-                            type="file" 
-                            accept="image/*" 
-                            className="hidden" 
-                            onChange={(e) => {
-                              const file = e.target.files?.[0]
-                              if (file) {
-                                handleQuestionImageUpload(qIdx, file)
-                              }
-                            }}
-                          />
-                        </label>
-                        {q.image_url && (
-                          <button
-                            type="button"
-                            onClick={() => updateQuestionData(qIdx, 'image_url', '')}
-                            className="px-3 py-2.5 rounded-xl bg-brand-error/10 hover:bg-brand-error/20 border border-brand-error/30 text-xs font-bold text-brand-error cursor-pointer transition-all"
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Options list for Multiple Choice */}
-                    {q.type === 'multiple_choice' ? (
-                      <div className="space-y-3">
-                        <label className="block text-[10px] font-bold uppercase tracking-wider text-text-secondary">
-                          Answer Options & Correct Selection
-                        </label>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {q.options.map((opt, oIdx) => (
-                            <div key={opt.id} className="space-y-2 p-3 rounded-xl bg-white/5 border border-border/50">
-                              <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => updateQuestionData(qIdx, 'correct_option_id', opt.id)}
-                                  className={`w-8 h-8 rounded-lg font-bold flex items-center justify-center border transition-all cursor-pointer ${
-                                    q.correct_option_id === opt.id
-                                      ? 'bg-brand-success/20 border-brand-success text-brand-success shadow-md shadow-brand-success/15'
-                                      : 'bg-white/5 dark:bg-white/5 border-border hover:border-brand-success/40 text-text-secondary'
-                                  }`}
-                                  title="Mark as Correct Answer"
-                                >
-                                  {opt.id}
-                                </button>
-                                <input
-                                  type="text"
-                                  placeholder={`Label for option ${opt.id}...`}
-                                  value={opt.text}
-                                  onChange={(e) => updateOptionText(qIdx, oIdx, e.target.value)}
-                                  className="flex-grow px-3 py-2 rounded-lg bg-white/5 dark:bg-white/5 border border-border text-text-primary text-xs focus:outline-none focus:border-brand-primary/50 transition-all font-medium"
-                                  required={q.type === 'multiple_choice'}
-                                />
-                              </div>
-                              
-                              {/* Option Image input */}
-                              <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-border/30">
-                                <input
-                                  type="url"
-                                  placeholder="Option Image URL (Optional)..."
-                                  value={opt.image_url || ''}
-                                  onChange={(e) => {
-                                    const updated = [...questions]
-                                    const updatedOptions = [...updated[qIdx].options]
-                                    updatedOptions[oIdx] = { ...updatedOptions[oIdx], image_url: e.target.value }
-                                    updated[qIdx].options = updatedOptions
-                                    setQuestions(updated)
-                                  }}
-                                  className="flex-grow min-w-[120px] px-2.5 py-1.5 rounded-lg bg-white/5 dark:bg-white/5 border border-border text-text-primary text-[10px] focus:outline-none focus:border-brand-primary/50 transition-all font-medium"
-                                />
-                                <div className="flex items-center gap-1.5 flex-shrink-0">
-                                  <label className="cursor-pointer px-2 py-1 rounded bg-white/10 hover:bg-white/15 border border-border text-[10px] font-bold text-text-primary flex items-center gap-1 transition-all">
-                                    <Upload className="w-3 h-3 text-brand-accent" />
-                                    <span>Upload</span>
-                                    <input 
-                                      type="file" 
-                                      accept="image/*" 
-                                      className="hidden" 
-                                      onChange={(e) => {
-                                        const file = e.target.files?.[0]
-                                        if (file) {
-                                          handleOptionImageUpload(qIdx, oIdx, file)
-                                        }
-                                      }}
-                                    />
-                                  </label>
-                                  {opt.image_url && (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const updated = [...questions]
-                                        const updatedOptions = [...updated[qIdx].options]
-                                        delete updatedOptions[oIdx].image_url
-                                        updated[qIdx].options = updatedOptions
-                                        setQuestions(updated)
-                                      }}
-                                      className="px-2 py-1 rounded bg-brand-error/10 hover:bg-brand-error/20 border border-brand-error/30 text-[10px] font-bold text-brand-error cursor-pointer transition-all"
-                                      title="Remove option image"
-                                    >
-                                      Remove
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      /* Correct text input for Open Ended */
-                      <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-wider text-text-secondary mb-2">
-                          Expected Answer (Case-Insensitive Exact Match)
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Hydrogen"
-                          value={q.correct_option_id || ''}
-                          onChange={(e) => updateQuestionData(qIdx, 'correct_option_id', e.target.value)}
-                          className="w-full px-4 py-2.5 rounded-xl bg-white/5 dark:bg-white/5 border border-border focus:border-brand-primary/50 text-text-primary placeholder:text-text-secondary/40 focus:outline-none transition-all text-sm font-semibold"
-                          required={q.type === 'open_ended'}
-                        />
-                      </div>
-                    )}
-
-                    {/* Question Time Limit */}
-                    <div className="flex items-center gap-2 pt-2">
-                      <Clock className="w-4 h-4 text-text-secondary" />
-                      <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider">
-                        Time Limit:
-                      </span>
-                      <select
-                        value={q.time_limit}
-                        onChange={(e) => updateQuestionData(qIdx, 'time_limit', parseInt(e.target.value))}
-                        className="px-2 py-1 bg-white/5 dark:bg-white/5 border border-border text-text-primary text-xs rounded-md focus:outline-none font-bold"
-                      >
-                        <option className="bg-bg text-text-primary" value={10}>10s</option>
-                        <option className="bg-bg text-text-primary" value={20}>20s</option>
-                        <option className="bg-bg text-text-primary" value={30}>30s</option>
-                        <option className="bg-bg text-text-primary" value={45}>45s</option>
-                        <option className="bg-bg text-text-primary" value={60}>60s</option>
-                      </select>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex justify-end gap-3 pt-6 border-t border-border">
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="px-5 py-2.5 text-xs font-semibold rounded-xl bg-white/5 border border-border hover:bg-white/10 transition-all cursor-pointer text-text-primary"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={creating}
-                  className="px-6 py-2.5 text-xs font-bold rounded-xl bg-gradient-to-r from-brand-primary to-brand-secondary hover:scale-[1.03] transition-all text-white disabled:opacity-50 disabled:scale-100 cursor-pointer"
-                >
-                  {creating ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
-                      Saving...
-                    </>
-                  ) : (
-                    editingQuizId ? 'Save Changes' : 'Save Quiz Template'
-                  )}
-                </button>
-              </div>
-            </form>
+            <QuizCreatorForm
+              editingQuizId={editingQuizId}
+              quizTitle={quizTitle}
+              setQuizTitle={setQuizTitle}
+              quizIsPublic={quizIsPublic}
+              setQuizIsPublic={setQuizIsPublic}
+              questions={questions}
+              setQuestions={setQuestions}
+              creating={creating}
+              onSubmit={handleCreateQuiz}
+              onCancel={resetForm}
+              onQuestionImageUpload={handleQuestionImageUpload}
+              onOptionImageUpload={handleOptionImageUpload}
+            />
           ) : (
             /* Dashboard Welcome Intro */
             <div className="p-8 rounded-3xl glass-panel text-center space-y-6">
               <Award className="w-16 h-16 text-brand-accent mx-auto animate-bounce mb-2" />
               <h2 className="text-3xl font-black text-gradient">Create Quiz Templates</h2>
               <p className="text-sm text-text-secondary max-w-md mx-auto">
-                Define reusable question sets once, host live session lobbies with new room codes anytime, and present project scoreboards instantly.
+                Define reusable question sets once, host live session lobbies with new room codes anytime, present live scoreboards, and export CSV gradebooks.
               </p>
               <button
                 onClick={() => setShowCreator(true)}
@@ -1522,69 +1157,22 @@ export const PresenterDashboard: React.FC = () => {
 
         {/* Host Session Options Modal */}
         {hostModalQuiz && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="w-full max-w-md p-6 rounded-3xl glass-panel space-y-6 border border-border shadow-2xl">
-              <div className="space-y-1 text-center">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-brand-primary-light">
-                  Host Live Room
-                </span>
-                <h3 className="text-xl font-black text-text-primary truncate">
-                  {hostModalQuiz.title}
-                </h3>
-              </div>
+          <HostSessionModal
+            quizTitle={hostModalQuiz.title}
+            speedScoringOption={speedScoringOption}
+            setSpeedScoringOption={setSpeedScoringOption}
+            onCancel={() => setHostModalQuiz(null)}
+            onConfirm={() => executeHostQuiz(hostModalQuiz.id, speedScoringOption)}
+          />
+        )}
 
-              <div className="p-4 rounded-2xl bg-white/5 dark:bg-white/5 border border-border space-y-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="space-y-0.5">
-                    <span className="text-xs font-bold text-text-primary block flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-brand-accent" />
-                      Speed-Based Bonus Scoring
-                    </span>
-                    <span className="text-[10px] text-text-secondary block">
-                      Faster correct answers earn up to 1,000 pts (Kahoot style)
-                    </span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setSpeedScoringOption(!speedScoringOption)}
-                    className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer flex-shrink-0 ${
-                      speedScoringOption ? 'bg-brand-primary' : 'bg-white/20'
-                    }`}
-                  >
-                    <span
-                      className={`block w-4 h-4 rounded-full bg-white transition-transform absolute top-1 ${
-                        speedScoringOption ? 'right-1' : 'left-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                <div className="text-[10px] text-text-secondary/70 italic border-t border-border/40 pt-2">
-                  {speedScoringOption 
-                    ? '✓ Speed Mode: Correct answers scale between 500 and 1,000 pts based on time elapsed.'
-                    : '✓ Standard Mode: All correct answers earn a flat 100 pts.'}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setHostModalQuiz(null)}
-                  className="w-1/2 py-3 rounded-xl border border-border text-xs font-bold text-text-secondary hover:bg-white/10 transition-all cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => executeHostQuiz(hostModalQuiz.id, speedScoringOption)}
-                  className="w-1/2 py-3 rounded-xl bg-gradient-to-r from-brand-primary to-brand-secondary hover:scale-[1.02] text-xs font-bold text-white transition-all cursor-pointer shadow-lg shadow-brand-primary/20"
-                >
-                  Start Session
-                </button>
-              </div>
-            </div>
-          </div>
+        {/* Session History & Gradebook Modal */}
+        {historyModalQuiz && (
+          <SessionHistoryModal
+            quizId={historyModalQuiz.id}
+            quizTitle={historyModalQuiz.title}
+            onClose={() => setHistoryModalQuiz(null)}
+          />
         )}
       </main>
     </div>
