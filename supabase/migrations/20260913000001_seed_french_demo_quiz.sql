@@ -17,21 +17,32 @@ end $$;
 
 -- 2. Create SQL helper functions to enable or disable demo quizzes
 create or replace function public.disable_demo_quizzes()
-returns void as $$
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 begin
   update public.quizzes set is_public = false where is_demo = true;
 end;
-$$ language plpgsql security definer;
+$$;
 
 create or replace function public.enable_demo_quizzes()
-returns void as $$
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 begin
   update public.quizzes set is_public = true where is_demo = true;
 end;
-$$ language plpgsql security definer;
+$$;
 
-grant execute on function public.disable_demo_quizzes() to anon, authenticated;
-grant execute on function public.enable_demo_quizzes() to anon, authenticated;
+revoke execute on function public.disable_demo_quizzes() from anon, public;
+grant execute on function public.disable_demo_quizzes() to authenticated;
+
+revoke execute on function public.enable_demo_quizzes() from anon, public;
+grant execute on function public.enable_demo_quizzes() to authenticated;
 
 -- 3. Seed Demo Quiz & Questions
 do $$
@@ -131,7 +142,7 @@ begin
   values (
     v_q6, v_quiz_id, 'multiple_choice',
     'Color vocabulary: Which English color corresponds to the French word ''Rouge''?',
-    'https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1518709779341-56cf4535e94b?w=800&auto=format&fit=crop&q=80',
     '[{"id":"A","text":"Red"},{"id":"B","text":"Blue"},{"id":"C","text":"Green"},{"id":"D","text":"Yellow"}]'::jsonb,
     20, 6
   );
@@ -155,7 +166,7 @@ begin
   values (
     v_q8, v_quiz_id, 'multiple_choice',
     'When you ask for ''De l''eau'' at a cafe, what beverage are you requesting?',
-    'https://images.unsplash.com/photo-1527061011665-3652c757a4d4?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1655518809831-6160005e11ba?w=800&auto=format&fit=crop&q=80',
     '[{"id":"A","text":"Water"},{"id":"B","text":"Milk"},{"id":"C","text":"Coffee"},{"id":"D","text":"Tea"}]'::jsonb,
     20, 8
   );
@@ -167,7 +178,7 @@ begin
   values (
     v_q9, v_quiz_id, 'open_ended',
     'Polite phrases: Type the French word for ''Thank you''.',
-    'https://images.unsplash.com/photo-1528642474498-1af0c17fd8c3?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1557395120-d48fc38063d6?w=800&auto=format&fit=crop&q=80',
     '[]'::jsonb,
     30, 9
   );
@@ -179,7 +190,7 @@ begin
   values (
     v_q10, v_quiz_id, 'multiple_choice',
     'Counting in French: If you have 3 croissants, how do you say the number ''3'' in French?',
-    'https://images.unsplash.com/photo-1509228468518-180dd4864904?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1548538931-b47653628cdc?w=800&auto=format&fit=crop&q=80',
     '[{"id":"A","text":"Trois"},{"id":"B","text":"Un"},{"id":"C","text":"Deux"},{"id":"D","text":"Quatre"}]'::jsonb,
     20, 10
   );
@@ -203,7 +214,7 @@ begin
   values (
     v_q12, v_quiz_id, 'multiple_choice',
     'Saying goodbye: How do you say ''Goodbye'' in French?',
-    'https://images.unsplash.com/photo-1516726817505-f5ed825624d8?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1775482080506-6f1e9db60ee8?w=800&auto=format&fit=crop&q=80',
     '[{"id":"A","text":"Au revoir"},{"id":"B","text":"S''il vous plaît"},{"id":"C","text":"Bienvenue"},{"id":"D","text":"Bonne nuit"}]'::jsonb,
     20, 12
   );
