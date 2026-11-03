@@ -12,7 +12,7 @@
   - Multiple-choice (with optional question & option images) and open-ended questions.
   - Instant question interruption (`⚡ Interrupt & Finish Question Now`), keyboard shortcuts (`Space` / `→` to advance, `F` for fullscreen), and synthesized Web Audio sound effects with mute toggle.
   - Animated live vote distribution charts (Recharts) and celebratory podium reveal.
-- **Speed-Based & Standard Scoring**: Presenters choose between Kahoot-style speed-bonus scoring (500–1,000 pts) or flat scoring (100 pts) when launching a session, graded securely server-side via PostgreSQL triggers.
+- **Speed-Based & Standard Scoring**: Presenters choose between time-decay speed-bonus scoring (500–1,000 pts) or flat scoring (100 pts) when launching a session, graded securely server-side via PostgreSQL triggers.
 - **Reusable Quiz Library & Community Sharing**:
   - Create, edit, duplicate/fork, and share public quizzes.
   - Built-in 12-question **🇫🇷 Learn French for Beginners (Demo)** quiz with toggle control.

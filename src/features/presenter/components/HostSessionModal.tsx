@@ -36,7 +36,7 @@ export const HostSessionModal: React.FC<HostSessionModalProps> = ({
                 Speed-Based Bonus Scoring
               </span>
               <span className="text-[10px] text-text-secondary block">
-                Faster correct answers earn up to 1,000 pts (Kahoot style)
+                Faster correct answers earn up to 1,000 pts (time-decay bonus)
               </span>
             </div>
 
