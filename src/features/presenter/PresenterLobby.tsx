@@ -4,6 +4,7 @@ import { Users, Play, Sparkles, Loader2, ArrowLeft, Copy, Check } from 'lucide-r
 import { supabase } from '../../lib/supabaseClient'
 import { ThemeToggle } from '../../components/ThemeToggle'
 import { SoundToggle } from '../../components/SoundToggle'
+import { HelpGuideModal } from '../../components/HelpGuideModal'
 import { useAuth } from '../../contexts/AuthContext'
 import { playJoinPop } from '../../lib/soundEffects'
 
@@ -216,6 +217,7 @@ export const PresenterLobby: React.FC = () => {
           Dashboard
         </button>
         <div className="flex items-center gap-3">
+          <HelpGuideModal initialTab="live" />
           <SoundToggle />
           <ThemeToggle />
         </div>

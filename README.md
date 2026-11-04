@@ -15,8 +15,9 @@
 - **Speed-Based & Standard Scoring**: Presenters choose between time-decay speed-bonus scoring (500–1,000 pts) or flat scoring (100 pts) when launching a session, graded securely server-side via PostgreSQL triggers.
 - **Reusable Quiz Library & Community Sharing**:
   - Create, edit, duplicate/fork, and share public quizzes.
+  - Organize and search thousands of quizzes with **Categories**, **Personal Folders**, and **`#tags`** (backed by PostgreSQL GIN indexes).
   - Built-in 12-question **🇫🇷 Learn French for Beginners (Demo)** quiz with toggle control.
-  - Bulk JSON import/export for quiz templates.
+  - Bulk JSON import/export (with folder, category, and tag support) and built-in interactive `(?)` User Guide (`USER_GUIDE.md`).
   - **Session History & CSV Gradebook Export** for teachers to download student rankings and accuracy.
 
 ---

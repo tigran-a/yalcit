@@ -4,6 +4,7 @@ import { Sparkles, ArrowRight, AlertCircle, Loader2, Presentation } from 'lucide
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../contexts/AuthContext'
 import { ThemeToggle } from '../../components/ThemeToggle'
+import { HelpGuideModal } from '../../components/HelpGuideModal'
 
 export const JoinSession: React.FC = () => {
   const { code: urlCode } = useParams<{ code?: string }>()
@@ -102,6 +103,7 @@ export const JoinSession: React.FC = () => {
           <Presentation className="w-4 h-4 text-brand-primary-light" />
           <span>{user && profile?.role === 'presenter' ? 'Presenter Dashboard' : 'Host a Quiz'}</span>
         </button>
+        <HelpGuideModal />
         <ThemeToggle />
       </div>
 

@@ -9,6 +9,7 @@ import confetti from 'canvas-confetti'
 import { supabase } from '../../lib/supabaseClient'
 import { ThemeToggle } from '../../components/ThemeToggle'
 import { SoundToggle } from '../../components/SoundToggle'
+import { HelpGuideModal } from '../../components/HelpGuideModal'
 import { useAuth } from '../../contexts/AuthContext'
 import { playTick, playRevealChime, playVictoryFanfare } from '../../lib/soundEffects'
 
@@ -600,6 +601,7 @@ export const PresenterQuiz: React.FC = () => {
           >
             {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
           </button>
+          <HelpGuideModal initialTab="live" />
           <SoundToggle />
           <ThemeToggle />
         </div>
