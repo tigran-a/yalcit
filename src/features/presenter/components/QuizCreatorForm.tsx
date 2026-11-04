@@ -20,6 +20,7 @@ export interface QuestionFormItem {
   options: { id: string; text: string; image_url?: string }[]
   time_limit: number
   correct_option_id?: string
+  explanation?: string
 }
 
 interface QuizCreatorFormProps {
@@ -393,6 +394,20 @@ export const QuizCreatorForm: React.FC<QuizCreatorFormProps> = ({
                 />
               </div>
             )}
+
+            {/* Explanation Note (Shown upon answer reveal) */}
+            <div className="space-y-1.5 pt-1">
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-text-secondary">
+                Explanation Note (Optional — shown to students & on projector upon reveal)
+              </label>
+              <textarea
+                placeholder="e.g. «Sois» is the irregular subjonctif présent of «être» for «tu». «Es» is indicatif, «seras» is futur simple."
+                value={q.explanation || ''}
+                onChange={(e) => updateQuestionData(qIdx, 'explanation', e.target.value)}
+                rows={2}
+                className="w-full px-4 py-2.5 rounded-xl bg-white/5 dark:bg-white/5 border border-border focus:border-brand-primary/50 text-text-primary placeholder:text-text-secondary/40 focus:outline-none transition-all text-xs font-medium resize-none"
+              />
+            </div>
 
             {/* Question Time Limit */}
             <div className="flex items-center gap-2 pt-2">

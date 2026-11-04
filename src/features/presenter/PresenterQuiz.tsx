@@ -957,19 +957,19 @@ export const PresenterQuiz: React.FC = () => {
                       return (
                         <div
                           key={opt.id}
-                          className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-all duration-300 ${
+                          className={`p-4 rounded-2xl border flex items-center justify-between gap-3 transition-all duration-300 shadow-sm ${
                             isCorrectOpt
-                              ? 'bg-brand-success/20 border-brand-success text-brand-success shadow-lg shadow-brand-success/10 ring-2 ring-brand-success/40'
+                              ? 'bg-emerald-500/20 border-emerald-500 text-emerald-900 dark:text-emerald-300 ring-2 ring-emerald-500/50 shadow-emerald-500/10'
                               : questionRevealed
-                              ? 'bg-white/5 border-border/50 opacity-65 text-text-secondary'
-                              : 'bg-white/5 dark:bg-white/5 border-border text-text-primary'
+                              ? 'bg-slate-100/70 dark:bg-white/5 border-slate-300 dark:border-white/10 opacity-60 text-slate-600 dark:text-slate-400'
+                              : 'bg-white dark:bg-slate-900/80 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 hover:border-brand-primary/40'
                           }`}
                         >
                           <div className="flex items-center gap-3 min-w-0">
-                            <span className={`w-9 h-9 rounded-xl font-black text-sm flex items-center justify-center flex-shrink-0 ${
+                            <span className={`w-9 h-9 rounded-xl font-black text-sm flex items-center justify-center flex-shrink-0 shadow-sm ${
                               isCorrectOpt
-                                ? 'bg-brand-success text-white'
-                                : 'bg-brand-primary/20 text-brand-primary-light border border-brand-primary/30'
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-brand-primary/15 text-brand-primary dark:text-brand-primary-light border border-brand-primary/30'
                             }`}>
                               {opt.id}
                             </span>
@@ -992,8 +992,8 @@ export const PresenterQuiz: React.FC = () => {
                             {showCount && (
                               <span className={`px-2.5 py-1 rounded-full text-xs font-extrabold font-mono ${
                                 isCorrectOpt
-                                  ? 'bg-brand-success text-white'
-                                  : 'bg-white/10 text-text-secondary'
+                                  ? 'bg-emerald-600 text-white'
+                                  : 'bg-slate-100 dark:bg-white/10 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-white/10'
                               }`}>
                                 {voteCount}
                               </span>
@@ -1150,16 +1150,31 @@ export const PresenterQuiz: React.FC = () => {
 
               {/* Reveal explanation footer */}
               {questionRevealed && (
-                <div className="p-4 rounded-2xl bg-white/5 dark:bg-white/5 border border-border flex items-center justify-between text-xs gap-4">
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <Check className="w-4 h-4 text-brand-success" />
-                    <span className="font-semibold text-text-secondary">Correct Answer:</span>
+                <div className="p-4 rounded-2xl bg-white/5 dark:bg-white/5 border border-border space-y-2">
+                  <div className="flex items-center justify-between text-xs gap-4">
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Check className="w-4 h-4 text-brand-success" />
+                      <span className="font-semibold text-text-secondary">Correct Answer:</span>
+                    </div>
+                    <span className="font-black text-brand-success truncate">
+                      {activeQuestion.type === 'multiple_choice'
+                        ? `Option ${activeQuestion.correct_option_id}${matchedCorrectOption?.text ? ` — ${matchedCorrectOption.text}` : ''}`
+                        : activeQuestion.correct_option_id}
+                    </span>
                   </div>
-                  <span className="font-black text-brand-success truncate">
-                    {activeQuestion.type === 'multiple_choice'
-                      ? `Option ${activeQuestion.correct_option_id}${matchedCorrectOption?.text ? ` — ${matchedCorrectOption.text}` : ''}`
-                      : activeQuestion.correct_option_id}
-                  </span>
+
+                  {activeQuestion.explanation && (
+                    <div className="pt-2 border-t border-border/40 text-left">
+                      <div className="flex items-start gap-2">
+                        <span className="px-1.5 py-0.5 rounded bg-brand-accent/15 text-brand-accent text-[10px] font-bold uppercase tracking-wider flex-shrink-0 mt-0.5">
+                          💡 Explanation
+                        </span>
+                        <p className="text-xs text-text-primary leading-relaxed font-medium">
+                          {activeQuestion.explanation}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

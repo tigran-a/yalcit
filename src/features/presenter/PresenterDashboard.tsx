@@ -188,6 +188,14 @@ export const PresenterDashboard: React.FC = () => {
           setError(`Question #${i + 1} has incomplete option labels.`)
           return
         }
+
+        // Validate that options do not duplicate each other (e.g. A: sois, C: sois)
+        const trimmedOptions = q.options.map(opt => opt.text.trim().toLowerCase())
+        const uniqueOptions = new Set(trimmedOptions)
+        if (uniqueOptions.size !== trimmedOptions.length) {
+          setError(`Question #${i + 1} has duplicate option texts. Each answer choice must be unique.`)
+          return
+        }
       }
     }
 
@@ -249,6 +257,7 @@ export const PresenterDashboard: React.FC = () => {
             quiz_id: targetQuizId,
             type: q.type,
             title: q.title.trim(),
+            explanation: q.explanation?.trim() || null,
             image_url: q.image_url?.trim() || null,
             options: q.type === 'multiple_choice' ? q.options : [],
             time_limit: q.time_limit,
@@ -382,6 +391,7 @@ export const PresenterDashboard: React.FC = () => {
           id: q.id,
           type: q.type,
           title: q.title,
+          explanation: q.explanation || '',
           image_url: q.image_url || '',
           options: q.options,
           time_limit: q.time_limit,
@@ -437,6 +447,7 @@ export const PresenterDashboard: React.FC = () => {
             quiz_id: newQuiz.id,
             type: q.type,
             title: q.title,
+            explanation: q.explanation || null,
             image_url: q.image_url,
             options: q.options,
             time_limit: q.time_limit,
@@ -664,6 +675,7 @@ export const PresenterDashboard: React.FC = () => {
           return {
             type: q.type,
             title: q.title,
+            explanation: q.explanation || null,
             image_url: q.image_url || null,
             options: q.options,
             time_limit: q.time_limit,
@@ -765,14 +777,28 @@ export const PresenterDashboard: React.FC = () => {
 
             for (let idx = 0; idx < item.questions.length; idx++) {
               const q = item.questions[idx]
+
+              // Deduplicate and validate options on import if multiple choice
+              let finalOptions = q.options || []
+              if (q.type === 'multiple_choice' && Array.isArray(finalOptions)) {
+                const seenTexts = new Set<string>()
+                finalOptions = finalOptions.filter((opt: any) => {
+                  const key = String(opt.text || '').trim().toLowerCase()
+                  if (!key || seenTexts.has(key)) return false
+                  seenTexts.add(key)
+                  return true
+                })
+              }
+
               const { data: insertedQuestion, error: qErr } = await supabase
                 .from('questions')
                 .insert({
                   quiz_id: newQuiz.id,
                   type: q.type || 'multiple_choice',
                   title: q.title || 'Untitled Question',
+                  explanation: q.explanation || null,
                   image_url: q.image_url || null,
-                  options: q.options || [],
+                  options: finalOptions,
                   time_limit: q.time_limit || 30,
                   sort_order: q.sort_order || (idx + 1)
                 })

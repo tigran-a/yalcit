@@ -657,6 +657,18 @@ export const StudentQuiz: React.FC = () => {
                       {correctOptionId}
                     </span>
                   )}
+                  {activeQuestion?.explanation && (
+                    <div className="pt-3 border-t border-border/40 text-left">
+                      <div className="flex items-start gap-2">
+                        <span className="px-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-accent text-[9px] font-bold uppercase tracking-wider flex-shrink-0 mt-0.5">
+                          💡 Note
+                        </span>
+                        <p className="text-xs text-text-primary leading-relaxed font-medium">
+                          {activeQuestion.explanation}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )
             })()}
