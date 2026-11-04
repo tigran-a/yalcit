@@ -13,6 +13,7 @@ import { HelpGuideModal } from '../../components/HelpGuideModal'
 import { HostSessionModal } from './components/HostSessionModal'
 import { SessionHistoryModal } from './components/SessionHistoryModal'
 import { QuizCreatorForm, QUIZ_CATEGORIES, type QuestionFormItem } from './components/QuizCreatorForm'
+import YAML from 'yaml'
 
 interface Quiz {
   id: string
@@ -712,10 +713,20 @@ export const PresenterDashboard: React.FC = () => {
       reader.onload = async (event) => {
         try {
           const content = event.target?.result as string
-          const parsed = JSON.parse(content)
+          let parsed: any
+          try {
+            parsed = JSON.parse(content)
+          } catch {
+            parsed = YAML.parse(content)
+          }
 
           if (!Array.isArray(parsed)) {
-            throw new Error('Invalid format: File content must be an array of quizzes.')
+            // Also accept a single quiz object in YAML/JSON
+            if (parsed && typeof parsed === 'object' && parsed.title && Array.isArray(parsed.questions)) {
+              parsed = [parsed]
+            } else {
+              throw new Error('Invalid format: File content must be a quiz or an array of quizzes (JSON or YAML).')
+            }
           }
 
           let importCount = 0
@@ -1137,7 +1148,7 @@ export const PresenterDashboard: React.FC = () => {
                     type="file"
                     ref={fileInputRef}
                     onChange={handleImportFile}
-                    accept=".json"
+                    accept=".json,.yaml,.yml"
                     className="hidden"
                   />
                 </div>
@@ -1433,7 +1444,7 @@ export const PresenterDashboard: React.FC = () => {
                     Bulk JSON Import
                   </span>
                   <h3 className="text-lg font-black text-text-primary">
-                    Import Quizzes from File
+                    Import Quizzes from File (JSON / YAML)
                   </h3>
                 </div>
                 <button
@@ -1521,7 +1532,7 @@ export const PresenterDashboard: React.FC = () => {
                   className="w-1/2 py-2.5 rounded-xl bg-gradient-to-r from-brand-primary to-brand-secondary hover:scale-[1.02] text-xs font-bold text-white transition-all cursor-pointer shadow-lg shadow-brand-primary/20 flex items-center justify-center gap-1.5"
                 >
                   <Upload className="w-3.5 h-3.5" />
-                  <span>Choose .json File</span>
+                  <span>Choose File (.json, .yaml)</span>
                 </button>
               </div>
             </div>
