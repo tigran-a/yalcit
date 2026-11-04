@@ -448,19 +448,19 @@ export const StudentQuiz: React.FC = () => {
   }
 
   return (
-    <div className="relative flex flex-col min-h-screen p-6 bg-bg text-text-primary transition-colors duration-300">
+    <div className="relative flex flex-col min-h-[100dvh] p-3 sm:p-6 bg-bg text-text-primary transition-colors duration-300">
       {/* Background Glows */}
       <div className="absolute top-1/4 left-1/4 w-80 h-80 bg-brand-primary/10 rounded-full blur-3xl animate-pulse-slow pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-brand-secondary/10 rounded-full blur-3xl animate-pulse-slow pointer-events-none" />
 
       {/* Header */}
-      <header className="relative z-10 w-full max-w-2xl mx-auto flex items-center justify-between mb-8 pb-4 border-b border-border">
-        <span className="text-xs font-bold text-text-secondary">
+      <header className="relative z-10 w-full max-w-2xl mx-auto flex items-center justify-between mb-3 sm:mb-6 pb-2.5 sm:pb-4 border-b border-border">
+        <span className="text-xs font-bold text-text-secondary truncate max-w-[45%]">
           {profile?.display_name}
         </span>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {flowState === 'answering' && activeQuestion && (
-            <span className="text-xs font-semibold text-text-primary px-3 py-1.5 bg-white/5 border border-border rounded-full flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-text-primary px-3 py-1 bg-white/5 border border-border rounded-full flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5 text-brand-accent animate-pulse" />
               {timeLeft}s
             </span>
@@ -472,15 +472,15 @@ export const StudentQuiz: React.FC = () => {
       {/* Main View Port */}
       <main className="relative z-10 w-full max-w-2xl mx-auto flex-grow flex flex-col justify-center">
         {flowState === 'answering' && activeQuestion && (
-          /* Answering Options Input screen */
-          <div className="space-y-8 p-8 rounded-3xl glass-panel animate-glow">
-            <div className="text-center space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-brand-primary-light">
+          /* Answering Options Input screen - Zero-Scroll Mobile Optimized */
+          <div className="space-y-3.5 sm:space-y-6 p-4 sm:p-8 rounded-3xl glass-panel animate-glow">
+            <div className="text-center space-y-1.5 sm:space-y-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-brand-primary-light block">
                 Question {currentQuestionIndex + 1} of {totalQuestions}
               </span>
-              <h2 className="text-2xl font-black text-text-primary leading-snug">{activeQuestion.title}</h2>
+              <h2 className="text-lg sm:text-2xl font-black text-text-primary leading-snug">{activeQuestion.title}</h2>
               {activeQuestion.image_url && (
-                <div className="relative w-full max-w-md mx-auto aspect-video rounded-2xl overflow-hidden border border-border bg-slate-100 dark:bg-white/5 shadow-md flex items-center justify-center">
+                <div className="relative w-full max-w-md mx-auto h-32 sm:h-52 rounded-2xl overflow-hidden border border-border bg-slate-100 dark:bg-white/5 shadow-md flex items-center justify-center">
                   <img 
                     src={activeQuestion.image_url} 
                     alt="Question context" 
@@ -495,22 +495,24 @@ export const StudentQuiz: React.FC = () => {
             </div>
 
             {activeQuestion.type === 'multiple_choice' ? (
-              /* MCQ layout */
-              <div className={`grid gap-3 max-w-md mx-auto ${
-                activeQuestion.options.some((o: any) => o.image_url) ? 'grid-cols-2' : 'grid-cols-1'
+              /* MCQ layout - 2x2 grid on smartphones so all 4 options + submit fit without scrolling */
+              <div className={`grid gap-2.5 sm:gap-3 max-w-lg mx-auto ${
+                activeQuestion.options.some((o: any) => o.image_url)
+                  ? 'grid-cols-2'
+                  : 'grid-cols-2 sm:grid-cols-2'
               }`}>
                 {activeQuestion.options.map((opt: any) => (
                   <button
                     key={opt.id}
                     onClick={() => handleSelectOption(opt.id)}
-                    className={`p-3 rounded-2xl border text-left font-bold text-text-primary transition-all duration-200 cursor-pointer flex flex-col gap-2.5 ${
+                    className={`p-2.5 sm:p-3.5 rounded-2xl border text-left font-bold text-text-primary transition-all duration-200 cursor-pointer flex flex-col justify-center gap-2 ${
                       selectedOption === opt.id
-                        ? 'bg-brand-primary/20 border-brand-primary text-brand-primary-light shadow-lg'
+                        ? 'bg-brand-primary/20 border-brand-primary text-brand-primary-light shadow-lg ring-1 ring-brand-primary/50'
                         : 'bg-white/5 dark:bg-white/5 border-border hover:border-brand-primary/30'
                     }`}
                   >
                     {opt.image_url && (
-                      <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden bg-slate-100 dark:bg-white/5">
+                      <div className="relative w-full h-20 sm:h-28 rounded-xl overflow-hidden bg-slate-100 dark:bg-white/5">
                         <img 
                           src={opt.image_url} 
                           alt={`Option ${opt.id}`} 
@@ -522,39 +524,39 @@ export const StudentQuiz: React.FC = () => {
                         />
                       </div>
                     )}
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       <span className={`w-7 h-7 rounded-lg flex items-center justify-center font-extrabold text-xs flex-shrink-0 ${
                         selectedOption === opt.id
-                          ? 'bg-brand-primary/30 text-text-primary'
-                          : 'bg-white/5 dark:bg-white/5 text-text-secondary'
+                          ? 'bg-brand-primary text-white'
+                          : 'bg-white/10 dark:bg-white/5 text-text-secondary'
                       }`}>
                         {opt.id}
                       </span>
-                      <span className="text-xs truncate">{opt.text}</span>
+                      <span className="text-xs sm:text-sm leading-tight line-clamp-2 break-words">{opt.text}</span>
                     </div>
                   </button>
                 ))}
               </div>
             ) : (
               /* Open Ended layout */
-              <form onSubmit={handleSubmitAnswer} className="max-w-md mx-auto space-y-4">
+              <form onSubmit={handleSubmitAnswer} className="max-w-md mx-auto w-full space-y-3">
                 <input
                   type="text"
                   placeholder="Type your answer here..."
                   value={openText}
                   onChange={(e) => handleOpenTextChange(e.target.value)}
-                  className="w-full px-5 py-4 rounded-2xl bg-white/5 dark:bg-white/5 border border-border focus:border-brand-primary/50 text-text-primary text-center text-lg font-medium placeholder:text-text-secondary/40 focus:outline-none transition-all duration-300"
+                  className="w-full px-4 py-3.5 sm:px-5 sm:py-4 rounded-2xl bg-white/5 dark:bg-white/5 border border-border focus:border-brand-primary/50 text-text-primary text-center text-base sm:text-lg font-medium placeholder:text-text-secondary/40 focus:outline-none transition-all duration-300"
                   maxLength={50}
                   required
                 />
               </form>
             )}
 
-            <div className="flex justify-center pt-4">
+            <div className="flex justify-center pt-1 sm:pt-2">
               <button
                 onClick={() => handleSubmitAnswer()}
                 disabled={submitting || (activeQuestion.type === 'multiple_choice' ? !selectedOption : !openText.trim())}
-                className="px-8 py-3.5 font-bold rounded-xl bg-gradient-to-r from-brand-primary to-brand-secondary hover:scale-[1.02] active:scale-[0.98] transition-all text-sm text-white disabled:opacity-50 disabled:scale-100 disabled:pointer-events-none cursor-pointer"
+                className="w-full sm:w-auto min-w-[200px] px-8 py-3 sm:py-3.5 font-bold rounded-xl bg-gradient-to-r from-brand-primary to-brand-secondary hover:scale-[1.02] active:scale-[0.98] transition-all text-sm text-white disabled:opacity-50 disabled:scale-100 disabled:pointer-events-none cursor-pointer shadow-md"
               >
                 {submitting ? (
                   <>

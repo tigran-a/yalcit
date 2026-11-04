@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Loader2, Award, Clock, ArrowRight, Check, Users, Square, Zap,
-  Download, Maximize2, Minimize2, ArrowLeft
+  Download, Maximize2, Minimize2, ArrowLeft, Eye, EyeOff, Cloud, List
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Cell, ResponsiveContainer } from 'recharts'
 import confetti from 'canvas-confetti'
@@ -60,6 +60,8 @@ export const PresenterQuiz: React.FC = () => {
   const [timerActive, setTimerActive] = useState(false)
   const [questionRevealed, setQuestionRevealed] = useState(false)
   const [showScoreboard, setShowScoreboard] = useState(false)
+  const [hideLiveBreakdown, setHideLiveBreakdown] = useState(true)
+  const [openEndedViewMode, setOpenEndedViewMode] = useState<'cloud' | 'list'>('cloud')
   const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'error'>('connecting')
 
   const timerRef = useRef<any>(null)
@@ -323,10 +325,40 @@ export const PresenterQuiz: React.FC = () => {
       const voteCount = responses.filter(r => r.answer?.option_id === opt.id).length
       return {
         name: `Option ${opt.id}`,
-        votes: voteCount,
+        votes: (!questionRevealed && hideLiveBreakdown) ? 0 : voteCount,
+        rawVotes: voteCount,
         optionText: opt.text
       }
     })
+  }
+
+  // Group Open-Ended answers by normalized text for Word Cloud visualization
+  const getWordCloudData = () => {
+    if (!activeQuestion || activeQuestion.type !== 'open_ended') return []
+
+    const groups: Record<string, { displayText: string; count: number; isCorrect: boolean; nicknames: string[] }> = {}
+
+    responses.forEach((r) => {
+      const rawText = (r.answer?.text || '').trim()
+      if (!rawText) return
+      const key = rawText.toLowerCase()
+      if (!groups[key]) {
+        groups[key] = {
+          displayText: rawText,
+          count: 0,
+          isCorrect: !!r.is_correct,
+          nicknames: []
+        }
+      }
+      groups[key].count += 1
+      if (r.is_correct) groups[key].isCorrect = true
+      if (r.nickname) groups[key].nicknames.push(r.nickname)
+    })
+
+    const list = Object.values(groups)
+    // Sort by count descending, then alphabetically for stable layout
+    list.sort((a, b) => b.count - a.count || a.displayText.localeCompare(b.displayText))
+    return list
   }
 
   // Aggregate global scoreboard scores across all questions in the session
@@ -843,80 +875,272 @@ export const PresenterQuiz: React.FC = () => {
               </div>
             </div>
 
-            {/* Right Interactive Chart Visualizer (Col span 2) */}
-            <div className="md:col-span-2 p-8 rounded-3xl glass-panel flex flex-col justify-between space-y-6">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-text-primary">Live Response Distribution</h3>
-                <span className="text-[10px] font-semibold text-text-secondary/60 hidden sm:inline">
-                  Tip: Press Space or → to advance · F for Fullscreen
-                </span>
+            {/* Right Interactive Chart & Projector Options Visualizer (Col span 2) */}
+            <div className="md:col-span-2 p-6 sm:p-8 rounded-3xl glass-panel flex flex-col justify-between space-y-6">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-3">
+                  <h3 className="text-sm font-bold text-text-primary">
+                    {activeQuestion.type === 'multiple_choice' ? 'Classroom Projection & Live Responses' : 'Open-Ended Word Cloud & Responses'}
+                  </h3>
+                  {activeQuestion.type === 'open_ended' && (
+                    <div className="inline-flex items-center rounded-xl bg-white/5 border border-border p-0.5 text-[10px] font-bold">
+                      <button
+                        type="button"
+                        onClick={() => setOpenEndedViewMode('cloud')}
+                        className={`flex items-center gap-1 px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                          openEndedViewMode === 'cloud'
+                            ? 'bg-brand-primary text-white shadow'
+                            : 'text-text-secondary hover:text-text-primary'
+                        }`}
+                      >
+                        <Cloud className="w-3 h-3" />
+                        <span>Word Cloud</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOpenEndedViewMode('list')}
+                        className={`flex items-center gap-1 px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                          openEndedViewMode === 'list'
+                            ? 'bg-brand-primary text-white shadow'
+                            : 'text-text-secondary hover:text-text-primary'
+                        }`}
+                      >
+                        <List className="w-3 h-3" />
+                        <span>Cards</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {!questionRevealed && (
+                    <button
+                      type="button"
+                      onClick={() => setHideLiveBreakdown(!hideLiveBreakdown)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-bold transition-all cursor-pointer ${
+                        hideLiveBreakdown
+                          ? 'bg-brand-primary/15 border-brand-primary/40 text-brand-primary-light'
+                          : 'bg-white/5 border-border text-text-secondary hover:text-text-primary'
+                      }`}
+                      title="Hide or peek live vote breakdown while students are still answering"
+                    >
+                      {hideLiveBreakdown ? (
+                        <>
+                          <EyeOff className="w-3.5 h-3.5" />
+                          <span>Votes Hidden Until Reveal</span>
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>Showing Live Votes</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                  <span className="text-[10px] font-semibold text-text-secondary/60 hidden lg:inline">
+                    Space / → to advance · F Fullscreen
+                  </span>
+                </div>
               </div>
 
               {activeQuestion.type === 'multiple_choice' ? (
-                /* Chart for Multiple Choice */
-                <div className="flex-grow h-[260px] self-stretch">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={getChartData()} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                      <XAxis 
-                        dataKey="name" 
-                        stroke="var(--color-text-secondary)" 
-                        tickLine={false} 
-                        axisLine={false} 
-                        style={{ fontSize: 11, fontWeight: 'bold' }} 
-                      />
-                      <YAxis 
-                        allowDecimals={false} 
-                        stroke="var(--color-text-secondary)" 
-                        tickLine={false} 
-                        axisLine={false} 
-                        style={{ fontSize: 11 }} 
-                      />
-                      <Bar dataKey="votes" radius={[12, 12, 0, 0]} barSize={40}>
-                        {getChartData().map((entry: any, index: number) => {
-                          const optionId = entry.name.split(' ')[1]
-                          let barColor = 'rgba(255, 255, 255, 0.15)'
-                          
-                          if (questionRevealed) {
-                            if (optionId === activeQuestion.correct_option_id) {
-                              barColor = 'var(--color-brand-success)'
-                            } else {
-                              barColor = 'var(--color-brand-error)'
-                            }
-                          } else {
-                            barColor = 'var(--color-brand-primary-light)'
-                          }
+                <div className="flex-grow flex flex-col justify-between space-y-5">
+                  {/* Projector-Friendly Option Cards so students can read A, B, C, D on the big screen */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {activeQuestion.options.map((opt: any) => {
+                      const isCorrectOpt = questionRevealed && opt.id === activeQuestion.correct_option_id
+                      const voteCount = responses.filter(r => r.answer?.option_id === opt.id).length
+                      const showCount = questionRevealed || !hideLiveBreakdown
 
-                          return <Cell key={`cell-${index}`} fill={barColor} />
-                        })}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
+                      return (
+                        <div
+                          key={opt.id}
+                          className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-all duration-300 ${
+                            isCorrectOpt
+                              ? 'bg-brand-success/20 border-brand-success text-brand-success shadow-lg shadow-brand-success/10 ring-2 ring-brand-success/40'
+                              : questionRevealed
+                              ? 'bg-white/5 border-border/50 opacity-65 text-text-secondary'
+                              : 'bg-white/5 dark:bg-white/5 border-border text-text-primary'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className={`w-9 h-9 rounded-xl font-black text-sm flex items-center justify-center flex-shrink-0 ${
+                              isCorrectOpt
+                                ? 'bg-brand-success text-white'
+                                : 'bg-brand-primary/20 text-brand-primary-light border border-brand-primary/30'
+                            }`}>
+                              {opt.id}
+                            </span>
+                            <div className="min-w-0">
+                              <span className="font-extrabold text-sm sm:text-base block break-words leading-snug">
+                                {opt.text}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {opt.image_url && (
+                              <img
+                                src={opt.image_url}
+                                alt={`Option ${opt.id}`}
+                                className="w-12 h-12 rounded-lg object-cover border border-border"
+                                referrerPolicy="no-referrer"
+                              />
+                            )}
+                            {showCount && (
+                              <span className={`px-2.5 py-1 rounded-full text-xs font-extrabold font-mono ${
+                                isCorrectOpt
+                                  ? 'bg-brand-success text-white'
+                                  : 'bg-white/10 text-text-secondary'
+                              }`}>
+                                {voteCount}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* Chart or Anti-Bandwagon Waiting Shield */}
+                  {!questionRevealed && hideLiveBreakdown ? (
+                    <div className="h-[190px] rounded-2xl bg-white/5 border border-dashed border-border flex flex-col items-center justify-center p-6 text-center space-y-2">
+                      <div className="flex items-center gap-2 text-brand-primary-light font-extrabold text-base">
+                        <Users className="w-5 h-5 animate-pulse" />
+                        <span>
+                          {responses.length}{totalParticipants > 0 ? ` of ${totalParticipants}` : ''} response{responses.length === 1 ? '' : 's'} locked in
+                        </span>
+                      </div>
+                      <p className="text-xs text-text-secondary max-w-md">
+                        Vote distribution is hidden while the timer is active so students answer independently. It will reveal automatically when time expires or when you click Reveal!
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="h-[190px] self-stretch">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={getChartData()} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                          <XAxis 
+                            dataKey="name" 
+                            stroke="var(--color-text-secondary)" 
+                            tickLine={false} 
+                            axisLine={false} 
+                            style={{ fontSize: 11, fontWeight: 'bold' }} 
+                          />
+                          <YAxis 
+                            allowDecimals={false} 
+                            stroke="var(--color-text-secondary)" 
+                            tickLine={false} 
+                            axisLine={false} 
+                            style={{ fontSize: 11 }} 
+                          />
+                          <Bar dataKey="votes" radius={[12, 12, 0, 0]} barSize={40}>
+                            {getChartData().map((entry: any, index: number) => {
+                              const optionId = entry.name.split(' ')[1]
+                              let barColor = 'var(--color-brand-primary-light)'
+                              
+                              if (questionRevealed) {
+                                if (optionId === activeQuestion.correct_option_id) {
+                                  barColor = 'var(--color-brand-success)'
+                                } else {
+                                  barColor = 'var(--color-brand-error)'
+                                }
+                              }
+
+                              return <Cell key={`cell-${index}`} fill={barColor} />
+                            })}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
                 </div>
               ) : (
-                /* Text list for Open Ended answers */
-                <div className="flex-grow max-h-[260px] overflow-y-auto pr-1 grid grid-cols-2 gap-2 align-content-start self-stretch">
-                  {responses.map((r) => (
-                    <div
-                      key={r.id}
-                      className={`p-3.5 rounded-xl border text-center font-bold text-xs truncate transition-all duration-300 ${
-                        questionRevealed
-                          ? r.is_correct
-                            ? 'bg-brand-success/20 border-brand-success text-brand-success'
-                            : 'bg-brand-error/10 border-brand-error/30 text-brand-error/80'
-                          : 'bg-white/5 dark:bg-white/5 border-border hover:border-brand-primary/30 text-text-primary'
-                      }`}
-                    >
-                      <span className="text-[10px] text-text-secondary/50 block font-normal truncate uppercase tracking-widest mb-1">
-                        {r.nickname}
-                      </span>
-                      {r.answer?.text}
-                    </div>
-                  ))}
-
-                  {responses.length === 0 && (
-                    <div className="col-span-2 flex flex-col items-center justify-center h-full text-text-secondary text-xs py-8">
+                /* Open-Ended Responses: Word Cloud (with Anonymized Live Mode) or Individual Cards */
+                <div className="flex-grow min-h-[260px] max-h-[320px] overflow-y-auto pr-1 flex flex-col justify-center">
+                  {responses.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full text-text-secondary text-xs py-8">
                       <Users className="w-10 h-10 text-border mb-2 animate-bounce" />
-                      <span>No answers submitted yet.</span>
+                      <span>Waiting for students to type their answers...</span>
+                    </div>
+                  ) : openEndedViewMode === 'cloud' ? (
+                    <div className="p-6 rounded-2xl bg-white/5 border border-border/60 flex flex-wrap items-center justify-center gap-3 sm:gap-4 min-h-[240px] content-center">
+                      {(() => {
+                        const cloudItems = getWordCloudData()
+                        const maxCount = Math.max(...cloudItems.map(i => i.count), 1)
+                        const isMasked = !questionRevealed && hideLiveBreakdown
+
+                        return cloudItems.map((item, idx) => {
+                          // Scale font size dynamically between 0.95rem and 2.5rem based on frequency
+                          const ratio = maxCount > 1 ? (item.count - 1) / (maxCount - 1) : 0.5
+                          const fontSizeRem = 0.95 + ratio * 1.45
+                          const maskedLabel = item.displayText.replace(/[^\s]/g, '•')
+
+                          return (
+                            <div
+                              key={idx}
+                              style={{ fontSize: `${fontSizeRem.toFixed(2)}rem` }}
+                              className={`px-4 py-2 rounded-2xl border font-black transition-all duration-500 flex items-center gap-2 shadow-sm ${
+                                questionRevealed
+                                  ? item.isCorrect
+                                    ? 'bg-brand-success/20 border-brand-success text-brand-success scale-105 shadow-brand-success/15'
+                                    : 'bg-brand-error/10 border-brand-error/30 text-brand-error/80'
+                                  : isMasked
+                                  ? 'bg-brand-primary/15 border-brand-primary/30 text-brand-primary-light'
+                                  : 'bg-white/10 border-border text-text-primary'
+                              }`}
+                              title={
+                                questionRevealed
+                                  ? `Submitted by: ${item.nicknames.join(', ')}`
+                                  : isMasked
+                                  ? 'Answer text hidden until reveal — size shows popularity!'
+                                  : `${item.count} submission(s)`
+                              }
+                            >
+                              <span className={isMasked ? 'tracking-widest select-none blur-[4px]' : ''}>
+                                {isMasked ? maskedLabel : item.displayText}
+                              </span>
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-mono font-extrabold ${
+                                questionRevealed && item.isCorrect
+                                  ? 'bg-brand-success text-white'
+                                  : 'bg-white/10 text-text-secondary'
+                              }`}>
+                                ×{item.count}
+                              </span>
+                            </div>
+                          )
+                        })
+                      })()}
+                      {!questionRevealed && hideLiveBreakdown && (
+                        <div className="w-full text-center pt-2 text-[11px] text-text-secondary">
+                          ✨ Live Word Cloud: Bubble size grows with matching answers! Words unblur on reveal.
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    /* Individual Student Answer Cards */
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 align-content-start self-stretch">
+                      {responses.map((r) => {
+                        const isMasked = !questionRevealed && hideLiveBreakdown
+                        return (
+                          <div
+                            key={r.id}
+                            className={`p-3.5 rounded-xl border text-center font-bold text-xs truncate transition-all duration-300 ${
+                              questionRevealed
+                                ? r.is_correct
+                                  ? 'bg-brand-success/20 border-brand-success text-brand-success'
+                                  : 'bg-brand-error/10 border-brand-error/30 text-brand-error/80'
+                                : 'bg-white/5 dark:bg-white/5 border-border text-text-primary'
+                            }`}
+                          >
+                            <span className="text-[10px] text-text-secondary/60 block font-normal truncate uppercase tracking-widest mb-1">
+                              {r.nickname}
+                            </span>
+                            <span className={isMasked ? 'blur-[4px] select-none tracking-widest text-brand-primary-light' : ''}>
+                              {isMasked ? '••••••' : r.answer?.text}
+                            </span>
+                          </div>
+                        )
+                      })}
                     </div>
                   )}
                 </div>

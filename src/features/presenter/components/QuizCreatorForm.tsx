@@ -1,5 +1,16 @@
 import React from 'react'
-import { Plus, Trash2, Upload, Clock, Loader2 } from 'lucide-react'
+import { Plus, Trash2, Upload, Clock, Loader2, Tag, Folder } from 'lucide-react'
+
+export const QUIZ_CATEGORIES = [
+  'General',
+  'Languages',
+  'Math',
+  'Science',
+  'History & Geography',
+  'Technology & CS',
+  'Arts & Literature',
+  'Trivia & Fun'
+]
 
 export interface QuestionFormItem {
   id?: string
@@ -15,6 +26,12 @@ interface QuizCreatorFormProps {
   editingQuizId: string | null
   quizTitle: string
   setQuizTitle: (title: string) => void
+  quizCategory: string
+  setQuizCategory: (cat: string) => void
+  quizFolder: string
+  setQuizFolder: (folder: string) => void
+  quizTagsInput: string
+  setQuizTagsInput: (tags: string) => void
   quizIsPublic: boolean
   setQuizIsPublic: (isPublic: boolean) => void
   questions: QuestionFormItem[]
@@ -30,6 +47,12 @@ export const QuizCreatorForm: React.FC<QuizCreatorFormProps> = ({
   editingQuizId,
   quizTitle,
   setQuizTitle,
+  quizCategory,
+  setQuizCategory,
+  quizFolder,
+  setQuizFolder,
+  quizTagsInput,
+  setQuizTagsInput,
   quizIsPublic,
   setQuizIsPublic,
   questions,
@@ -105,6 +128,54 @@ export const QuizCreatorForm: React.FC<QuizCreatorFormProps> = ({
           className="w-full px-5 py-4 rounded-2xl bg-white/5 dark:bg-white/5 border border-border focus:border-brand-primary/50 text-text-primary placeholder:text-text-secondary/40 focus:outline-none transition-all duration-300 font-bold"
           required
         />
+      </div>
+
+      {/* Category, Folder & Tags for Search & Organization */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+          <label className="block text-[10px] font-bold uppercase tracking-wider text-text-secondary mb-2">
+            Category
+          </label>
+          <select
+            value={quizCategory}
+            onChange={(e) => setQuizCategory(e.target.value)}
+            className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 dark:bg-white/5 border border-border text-text-primary text-xs focus:outline-none focus:border-brand-primary/50 transition-all font-bold"
+          >
+            {QUIZ_CATEGORIES.map((cat) => (
+              <option key={cat} className="bg-bg text-text-primary" value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-[10px] font-bold uppercase tracking-wider text-text-secondary mb-2 flex items-center gap-1">
+            <Folder className="w-3 h-3 text-brand-accent" />
+            <span>Personal Folder (Optional)</span>
+          </label>
+          <input
+            type="text"
+            placeholder="e.g. Grade 10 / Fall Semester"
+            value={quizFolder}
+            onChange={(e) => setQuizFolder(e.target.value)}
+            className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 dark:bg-white/5 border border-border focus:border-brand-primary/50 text-text-primary placeholder:text-text-secondary/40 focus:outline-none transition-all text-xs font-semibold"
+          />
+        </div>
+
+        <div>
+          <label className="block text-[10px] font-bold uppercase tracking-wider text-text-secondary mb-2 flex items-center gap-1">
+            <Tag className="w-3 h-3 text-brand-primary-light" />
+            <span>Search Tags (Comma-separated)</span>
+          </label>
+          <input
+            type="text"
+            placeholder="e.g. french, beginner, verbs"
+            value={quizTagsInput}
+            onChange={(e) => setQuizTagsInput(e.target.value)}
+            className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 dark:bg-white/5 border border-border focus:border-brand-primary/50 text-text-primary placeholder:text-text-secondary/40 focus:outline-none transition-all text-xs font-semibold"
+          />
+        </div>
       </div>
 
       {/* Privacy checkbox */}
