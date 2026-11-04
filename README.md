@@ -1,5 +1,7 @@
 # YALCIT — Yet Another Live Classroom Interaction Tool
 
+> 🌐 **Live Application:** Available to use at [**https://quiz.practicenow.eu**](https://quiz.practicenow.eu) (or via [https://yalcit.practicenow.eu](https://yalcit.practicenow.eu)).
+
 **Yalcit** is a real-time classroom quiz and live interaction platform built with **React 19**, **TypeScript**, **Tailwind CSS v4**, and **Supabase** (PostgreSQL, Row-Level Security, Realtime Presence & Postgres Changes, and Storage).
 
 ---
