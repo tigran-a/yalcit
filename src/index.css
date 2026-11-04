@@ -134,9 +134,50 @@ html, body, #root {
 }
 
 .text-gradient {
+  /* Solid fallback for old TV / smart-display browsers */
+  color: #9b6af0;
+  background: linear-gradient(135deg, #9b6af0 0%, #ed3bbd 100%);
   background: linear-gradient(135deg, var(--color-brand-primary-light) 0%, var(--color-brand-secondary) 100%);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+@supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+  .text-gradient {
+    background: none;
+    -webkit-text-fill-color: currentColor;
+  }
+}
+
+/*
+ * Legacy-browser fallback for gradient buttons.
+ * Tailwind v4 emits gradients like `linear-gradient(in oklab, ...)`; older TV
+ * browsers reject the whole declaration, leaving a transparent button with
+ * white text (invisible). A solid background-color is always painted beneath
+ * the gradient, and browsers without `in oklab` support get a plain hex gradient.
+ * These rules are intentionally unlayered so they override Tailwind utilities.
+ */
+.bg-gradient-to-r.from-brand-primary {
+  background-color: #7c3aed;
+}
+.bg-gradient-to-r.from-emerald-600 {
+  background-color: #059669;
+}
+.bg-gradient-to-r.from-red-600 {
+  background-color: #dc2626;
+}
+
+@supports not (background-image: linear-gradient(in oklab, red, blue)) {
+  .bg-gradient-to-r.from-brand-primary {
+    background-image: linear-gradient(to right, #7c3aed, #ed3bbd);
+  }
+  .bg-gradient-to-r.from-emerald-600 {
+    background-image: linear-gradient(to right, #059669, #14b8a6);
+  }
+  .bg-gradient-to-r.from-red-600 {
+    background-image: linear-gradient(to right, #dc2626, #d97706);
+  }
 }
 
 /* Custom WebKit / Chromium / Firefox Autofill Styling Overrides */
