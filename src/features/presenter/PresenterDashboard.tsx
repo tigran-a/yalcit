@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Plus, Play, LogOut, Loader2, Trash2, Award, FileText,
   CheckCircle2, Edit2, Copy, Eye, EyeOff, Upload, Download,
-  ExternalLink, RefreshCw, BarChart3, Home, Search, Folder, Tag, X, HelpCircle
+  ExternalLink, RefreshCw, BarChart3, Home, Search, Folder, Tag, X, HelpCircle, QrCode
 } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../contexts/AuthContext'
@@ -12,6 +12,7 @@ import { SoundToggle } from '../../components/SoundToggle'
 import { HelpGuideModal } from '../../components/HelpGuideModal'
 import { HostSessionModal } from './components/HostSessionModal'
 import { SessionHistoryModal } from './components/SessionHistoryModal'
+import { QrLoginModal } from './components/QrLoginModal'
 import { QuizCreatorForm, QUIZ_CATEGORIES, type QuestionFormItem } from './components/QuizCreatorForm'
 import YAML from 'yaml'
 
@@ -51,6 +52,7 @@ export const PresenterDashboard: React.FC = () => {
   const [demoEnabled, setDemoEnabled] = useState(true)
 
   // Quiz Creator/Editor Form States
+  const [showQrLoginModal, setShowQrLoginModal] = useState(false)
   const [showCreator, setShowCreator] = useState(false)
   const [editingQuizId, setEditingQuizId] = useState<string | null>(null)
   const [quizTitle, setQuizTitle] = useState('')
@@ -928,6 +930,14 @@ export const PresenterDashboard: React.FC = () => {
           >
             <RefreshCw className="w-4 h-4" />
           </button>
+          <button
+            onClick={() => setShowQrLoginModal(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 border border-border hover:bg-white/10 text-xs font-semibold text-text-secondary hover:text-text-primary transition-all cursor-pointer"
+            title="Sign in on another device via QR code"
+          >
+            <QrCode className="w-4 h-4" />
+            <span className="hidden sm:inline">QR Login</span>
+          </button>
           <HelpGuideModal />
           <SoundToggle />
           <ThemeToggle />
@@ -1573,6 +1583,11 @@ export const PresenterDashboard: React.FC = () => {
             onClose={() => setShowImportHelp(false)}
             hideTriggerButton
           />
+        )}
+
+        {/* QR Login Modal for signing in on phone/tablet */}
+        {showQrLoginModal && (
+          <QrLoginModal onClose={() => setShowQrLoginModal(false)} />
         )}
       </main>
     </div>

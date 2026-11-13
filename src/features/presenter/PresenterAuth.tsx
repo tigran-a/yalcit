@@ -1,19 +1,68 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Sparkles, Mail, Lock, User as UserIcon, AlertCircle, Loader2 } from 'lucide-react'
+import { Sparkles, Mail, Lock, User as UserIcon, AlertCircle, Loader2, Eye, EyeOff, Wand2 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
+import { supabase } from '../../lib/supabaseClient'
 import { ThemeToggle } from '../../components/ThemeToggle'
 
 export const PresenterAuth: React.FC = () => {
-  const [isSignUp, setIsSignUp] = useState(false)
+  const [authMode, setAuthMode] = useState<'signin' | 'signup' | 'magic'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const { signInPresenter, signUpPresenter } = useAuth()
+  const { user, profile, signInPresenter, signUpPresenter } = useAuth()
   const navigate = useNavigate()
+
+  // Handle QR session transfer from another logged-in device (#transfer_access=...&transfer_refresh=...)
+  useEffect(() => {
+    const hash = window.location.hash
+    if (!hash || !hash.includes('transfer_access=')) return
+
+    const params = new URLSearchParams(hash.slice(1))
+    const accessToken = params.get('transfer_access')
+    const refreshToken = params.get('transfer_refresh')
+
+    // Immediately strip tokens from URL bar / browser history
+    window.history.replaceState(null, '', window.location.pathname + window.location.search)
+
+    if (!accessToken || !refreshToken) return
+
+    let active = true
+    setLoading(true)
+    setError(null)
+
+    supabase.auth
+      .setSession({ access_token: accessToken, refresh_token: refreshToken })
+      .then(({ error: sessionErr }) => {
+        if (!active) return
+        if (sessionErr) {
+          setError('QR login link expired or already used. Please generate a fresh QR code or sign in below.')
+          setLoading(false)
+        } else {
+          navigate('/presenter/dashboard', { replace: true })
+        }
+      })
+      .catch(() => {
+        if (!active) return
+        setError('Could not complete QR login. Please sign in with your email and password.')
+        setLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [navigate])
+
+  // Redirect automatically once authenticated as a presenter (e.g., via Magic Link)
+  useEffect(() => {
+    if (user && profile?.role === 'presenter') {
+      navigate('/presenter/dashboard', { replace: true })
+    }
+  }, [user, profile, navigate])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -23,7 +72,30 @@ export const PresenterAuth: React.FC = () => {
     const cleanedPassword = password.trim()
     const cleanedName = name.trim()
 
-    if (!cleanedEmail || !cleanedPassword || (isSignUp && !cleanedName)) {
+    if (authMode === 'magic') {
+      if (!cleanedEmail) {
+        setError('Please enter your email address.')
+        return
+      }
+      setLoading(true)
+      try {
+        const redirectTo = `${window.location.origin}${import.meta.env.BASE_URL}presenter/auth`
+        const { error: otpErr } = await supabase.auth.signInWithOtp({
+          email: cleanedEmail,
+          options: { emailRedirectTo: redirectTo }
+        })
+        if (otpErr) throw otpErr
+        setError('Magic login link sent! Check your email inbox on this device to sign in.')
+      } catch (err: any) {
+        console.error('Magic link failed:', err)
+        setError(err.message || 'Could not send magic login link.')
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+
+    if (!cleanedEmail || !cleanedPassword || (authMode === 'signup' && !cleanedName)) {
       setError('Please fill in all fields.')
       return
     }
@@ -36,7 +108,7 @@ export const PresenterAuth: React.FC = () => {
     setLoading(true)
 
     try {
-      if (isSignUp) {
+      if (authMode === 'signup') {
         await signUpPresenter(cleanedEmail, cleanedPassword, cleanedName)
         setError('Verification link sent! Please check your email inbox to activate your account.')
       } else {
@@ -85,7 +157,7 @@ export const PresenterAuth: React.FC = () => {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {isSignUp && (
+          {authMode === 'signup' && (
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-text-secondary mb-2">
                 Full Name
@@ -127,25 +199,37 @@ export const PresenterAuth: React.FC = () => {
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-text-secondary mb-2">
-              Password
-            </label>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-text-secondary/50">
-                <Lock className="w-5 h-5" />
-              </span>
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete={isSignUp ? 'new-password' : 'current-password'}
-                className="w-full pl-12 pr-5 py-4 rounded-2xl bg-white/5 dark:bg-white/5 border border-border focus:border-brand-primary/50 text-text-primary placeholder:text-text-secondary/40 focus:outline-none transition-all duration-300"
-                disabled={loading}
-              />
+          {authMode !== 'magic' && (
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-text-secondary mb-2">
+                Password
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-text-secondary/50">
+                  <Lock className="w-5 h-5" />
+                </span>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'}
+                  className="w-full pl-12 pr-12 py-4 rounded-2xl bg-white/5 dark:bg-white/5 border border-border focus:border-brand-primary/50 text-text-primary placeholder:text-text-secondary/40 focus:outline-none transition-all duration-300"
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                  className="absolute inset-y-0 right-0 flex items-center pr-4 text-text-secondary/60 hover:text-text-primary transition-colors cursor-pointer"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           <button
             type="submit"
@@ -154,34 +238,55 @@ export const PresenterAuth: React.FC = () => {
           >
             {loading ? (
               <Loader2 className="w-5 h-5 animate-spin" />
-            ) : isSignUp ? (
+            ) : authMode === 'signup' ? (
               'Create Presenter Account'
+            ) : authMode === 'magic' ? (
+              <>
+                <Wand2 className="w-5 h-5" />
+                Send Magic Login Link
+              </>
             ) : (
               'Sign In as Presenter'
             )}
           </button>
         </form>
 
-        <div className="mt-8 text-center border-t border-border pt-6 text-sm text-text-secondary">
-          {isSignUp ? (
+        <div className="mt-6 flex flex-col items-center gap-3 border-t border-border pt-6 text-sm text-text-secondary">
+          {authMode === 'signin' && (
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMode('magic')
+                setError(null)
+              }}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-text-secondary hover:text-brand-primary-light transition-colors cursor-pointer"
+            >
+              <Wand2 className="w-3.5 h-3.5" />
+              Sign in with Email Link (no password)
+            </button>
+          )}
+
+          {authMode !== 'signin' ? (
             <p>
               Already have an account?{' '}
               <button
+                type="button"
                 onClick={() => {
-                  setIsSignUp(false)
+                  setAuthMode('signin')
                   setError(null)
                 }}
                 className="font-bold text-brand-primary-light hover:text-brand-primary transition-colors cursor-pointer"
               >
-                Sign In
+                Sign In with Password
               </button>
             </p>
           ) : (
             <p>
               New to YALCIT?{' '}
               <button
+                type="button"
                 onClick={() => {
-                  setIsSignUp(true)
+                  setAuthMode('signup')
                   setError(null)
                 }}
                 className="font-bold text-brand-primary-light hover:text-brand-primary transition-colors cursor-pointer"
